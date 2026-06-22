@@ -2,12 +2,20 @@
 # As regiões (hp/mana) são preenchidas pela calibração; não edite à mão.
 
 captura:
-  backend: auto        # auto | bettercam | wgc | mss
-                       #   auto: tenta DXGI -> WGC -> mss
-                       #   wgc:  Windows Graphics Capture — pega DX12/OpenGL no Python 3.13
-                       #   mss:  GDI puro — NÃO captura DX12 (vem preto)
+  backend: auto        # auto | bettercam | wgc | mss | tibia_arquivo
+                       #   auto:          tenta DXGI -> WGC -> mss (automático)
+                       #   wgc:           Windows Graphics Capture — pega DX12/OpenGL no Python 3.13
+                       #   mss:           GDI puro — NÃO captura DX12 (vem preto)
+                       #   tibia_arquivo: usa a hotkey de screenshot DO TIBIA e lê o arquivo PNG
+                       #                 → obrigatório se o Tibia bloquear toda captura externa
+                       #                 (PrintScreen e mss vêm pretos = WDA_EXCLUDEFROMCAPTURE ativo)
   monitor: 0           # índice do monitor (0 = primário)
-  fps_alvo: 15         # ticks por segundo do loop do bot
+  fps_alvo: 15         # ticks por segundo do loop do bot (use 3-5 com tibia_arquivo)
+
+  # --- campos usados SOMENTE com backend: tibia_arquivo ---
+  tibia_screenshots: ""       # pasta onde o Tibia salva screenshots (vazio = auto-detecta)
+                               # ex.: C:\Users\joao\AppData\Roaming\Tibia\packages\Tibia\screenshots
+  hotkey_screenshot: ctrl+p  # hotkey configurada em Options > Interface > Screenshot do Tibia
 
 regioes:               # [left, top, right, bottom] em pixels absolutos do desktop
   hp: [0, 0, 0, 0]            # preenchido por calibrar.py

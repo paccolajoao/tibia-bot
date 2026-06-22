@@ -81,12 +81,15 @@ def _salvar_e_diagnosticar(img) -> bool:
     return True
 
 
-def _capturar_screenshot(monitor_idx: int = 0) -> np.ndarray | None:
-    """Captura a tela inteira tentando mss (GDI/DWM) → PIL ImageGrab → WGC.
+def _capturar_screenshot(
+    monitor_idx: int = 0,
+    hotkey_screenshot: str = "ctrl+p",
+    pasta_screenshots: str = "",
+) -> np.ndarray | None:
+    """Tenta capturar a tela por vários métodos em ordem crescente de complexidade.
 
-    Para janela DX11 visível, mss lê corretamente via DWM (GDI BitBlt).
-    PIL ImageGrab é o segundo fallback (Pillow precisa estar instalado).
-    WGC entra por último — em alguns setups DX11 Blt-model o WGC lê preto.
+    mss/PIL/WGC funcionam quando o Tibia NÃO usa WDA_EXCLUDEFROMCAPTURE.
+    tibia_arquivo é o fallback para quando o Tibia bloqueia toda captura externa.
     """
     # 1. mss (GDI via DWM — funciona para windowed DX11 visível)
     try:
@@ -118,7 +121,7 @@ def _capturar_screenshot(monitor_idx: int = 0) -> np.ndarray | None:
     except Exception as e:
         print(f"[cap] PIL falhou: {e}")
 
-    # 3. WGC (último recurso)
+    # 3. WGC
     try:
         from bot.captura.wgc import CapturadorWGC
 
@@ -136,6 +139,63 @@ def _capturar_screenshot(monitor_idx: int = 0) -> np.ndarray | None:
     except Exception as e:
         print(f"[cap] WGC falhou: {e}")
 
+    # 4. Screenshot interno do Tibia (WDA_EXCLUDEFROMCAPTURE ativo)
+    print("\n[cap] Todos os métodos diretos retornaram preto.")
+    print("[cap] Tibia usa proteção WDA_EXCLUDEFROMCAPTURE — usando hotkey de screenshot interno.")
+    return _capturar_via_tibia_arquivo(hotkey_screenshot, pasta_screenshots)
+
+
+def _capturar_via_tibia_arquivo(hotkey: str, pasta_str: str) -> np.ndarray | None:
+    """Envia a hotkey de screenshot do Tibia e aguarda o arquivo aparecer."""
+    from bot.captura.tibia_arquivo import _arquivo_mais_novo, _hotkey_send, detectar_pasta_screenshots
+    import pathlib
+
+    pasta = pathlib.Path(pasta_str) if pasta_str else detectar_pasta_screenshots()
+    if pasta is None or not pasta.is_dir():
+        print(
+            "\n*** Pasta de screenshots do Tibia não encontrada. ***\n"
+            "  1. Tire uma screenshot no Tibia (Options > Interface > Screenshot hotkey).\n"
+            "  2. Veja em qual pasta o arquivo PNG apareceu.\n"
+            "  3. Configure no config.yaml:\n"
+            "       captura:\n"
+            "         backend: tibia_arquivo\n"
+            "         tibia_screenshots: C:\\caminho\\para\\a\\pasta\n"
+            f"        hotkey_screenshot: {hotkey}\n"
+        )
+        return None
+
+    print(f"[cap] Pasta de screenshots: {pasta}")
+    print(f"[cap] Focando Tibia e enviando hotkey '{hotkey}' em 2 segundos…")
+    time.sleep(2.0)
+
+    t_antes = time.time() - 0.5
+    _hotkey_send(hotkey)
+    print("[cap] Hotkey enviada. Aguardando arquivo (até 5 s)…")
+
+    prazo = time.perf_counter() + 5.0
+    while time.perf_counter() < prazo:
+        time.sleep(0.1)
+        arquivo = _arquivo_mais_novo(pasta, t_antes)
+        if arquivo is None:
+            continue
+        time.sleep(0.05)
+        try:
+            img = cv2.imread(str(arquivo))
+        except Exception:
+            continue
+        if img is None:
+            continue
+        brilho = float(img.max())
+        print(f"[cap] Tibia screenshot: {img.shape[1]}x{img.shape[0]}  brilho max={brilho:.0f}")
+        if brilho > 12:
+            return img
+
+    print(
+        "\n*** Screenshot do Tibia não chegou. ***\n"
+        f"  • Confira se a hotkey '{hotkey}' está correta (Options > Interface > Screenshot).\n"
+        "  • O Tibia precisa estar em foco e com um personagem no mapa.\n"
+        f"  • Pasta monitorada: {pasta}\n"
+    )
     return None
 
 
@@ -149,7 +209,11 @@ def main() -> int:
     # o terminal está na frente agora; traz o Tibia pra frente e dá tempo de aparecer
     _aguardar_jogo_na_frente(cfg.seguranca.titulo_janela_contains)
 
-    img = _capturar_screenshot(cfg.captura.monitor)
+    img = _capturar_screenshot(
+        cfg.captura.monitor,
+        hotkey_screenshot=cfg.captura.hotkey_screenshot,
+        pasta_screenshots=cfg.captura.tibia_screenshots,
+    )
     if img is None:
         print("\n*** Todos os métodos retornaram preto. ***")
         print("Certifique-se de que o Tibia está em MODO JANELA e visível na tela.")

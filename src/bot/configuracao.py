@@ -21,9 +21,12 @@ CAMINHO_CONFIG_EXEMPLO = RAIZ_PROJETO / "config" / "config.exemplo.yaml"
 
 
 class CapturaConfig(BaseModel):
-    backend: str = "auto"  # auto | bettercam | mss
+    backend: str = "auto"  # auto | bettercam | wgc | mss | tibia_arquivo
     monitor: int = 0
     fps_alvo: float = 15.0
+    # campos usados apenas com backend=tibia_arquivo
+    tibia_screenshots: str = ""       # pasta de screenshots do Tibia (vazio = auto-detecta)
+    hotkey_screenshot: str = "ctrl+p"  # hotkey configurada em Options > Interface do Tibia
 
 
 class RegioesConfig(BaseModel):

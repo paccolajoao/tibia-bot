@@ -3,6 +3,9 @@
 Ordem do `auto`: DXGI (bettercam, só Python <3.13) -> WGC (Windows Graphics Capture,
 pega DX11/DX12/OpenGL e roda no 3.13) -> mss (GDI, fallback Python puro).
 
+Para clientes com WDA_EXCLUDEFROMCAPTURE (ex.: Tibia oficial com BattlEye), use
+backend: tibia_arquivo e configure tibia_screenshots + hotkey_screenshot no config.yaml.
+
 O mss NÃO captura surfaces aceleradas por GPU (DX12 vem preto); por isso o WGC entra
 antes dele no `auto`. Cada nível é tentado com try/except e cai para o próximo.
 """
@@ -21,6 +24,9 @@ def criar_capturador(
     backend: str = "auto",
     monitor: int = 0,
     log: Logger | None = None,
+    tibia_screenshots: str = "",
+    hotkey_screenshot: str = "ctrl+p",
+    fps_alvo: float = 3.0,
 ) -> CapturadorBase:
     emitir = log or (lambda _msg: None)
 
@@ -48,7 +54,30 @@ def criar_capturador(
         except Exception as e:  # ImportError, sem display, ou sem frame
             emitir(f"WGC indisponível ({e}); usando mss")
 
-    cap = CapturadorMSS(monitor=monitor)
-    cap.iniciar()
-    emitir("Captura: backend mss (Python puro/GDI) ativo — NÃO captura DX12 (vem preto)")
-    return cap
+    if backend in ("auto", "mss"):
+        cap = CapturadorMSS(monitor=monitor)
+        cap.iniciar()
+        emitir("Captura: backend mss (Python puro/GDI) ativo — NÃO captura DX12 (vem preto)")
+        return cap
+
+    if backend == "tibia_arquivo":
+        try:
+            from bot.captura.tibia_arquivo import CapturadorTibiaArquivo
+
+            cap = CapturadorTibiaArquivo(
+                pasta=tibia_screenshots,
+                hotkey=hotkey_screenshot,
+                fps=fps_alvo,
+            )
+            cap.iniciar()
+            emitir(
+                f"Captura: backend tibia_arquivo ativo "
+                f"(hotkey '{hotkey_screenshot}', pasta: {cap._pasta})"
+            )
+            return cap
+        except Exception as e:
+            raise RuntimeError(f"Backend tibia_arquivo falhou: {e}") from e
+
+    raise RuntimeError(
+        f"Backend '{backend}' desconhecido. Use: auto | bettercam | wgc | mss | tibia_arquivo"
+    )

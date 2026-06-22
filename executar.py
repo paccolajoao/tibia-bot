@@ -43,7 +43,14 @@ def main() -> int:
         print(f"[bot] {msg}")
         barramento.publicar(LinhaRaciocinio(time.perf_counter(), 0, msg, nivel))
 
-    capturador = criar_capturador(cfg.captura.backend, cfg.captura.monitor, log)
+    capturador = criar_capturador(
+        cfg.captura.backend,
+        cfg.captura.monitor,
+        log,
+        tibia_screenshots=cfg.captura.tibia_screenshots,
+        hotkey_screenshot=cfg.captura.hotkey_screenshot,
+        fps_alvo=cfg.captura.fps_alvo,
+    )
     entrada = EntradaDirectInput(cfg.entrada.atraso_pre_ms, cfg.entrada.atraso_pos_ms)
     cooldown = GerenciadorCooldown({**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s})
     comportamentos = [AutoCura(cfg.cura, cfg.visao.confianca_minima)]
