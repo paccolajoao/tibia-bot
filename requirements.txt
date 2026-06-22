@@ -1,8 +1,9 @@
-# Runtime — Bot Tibia (Windows). Python 3.12 recomendado; 3.13 funciona via mss.
+# Runtime — Bot Tibia (Windows). Python 3.12 ou 3.13.
 
-# Captura de tela
-bettercam==1.0.0 ; python_version < "3.13"   # DXGI rápido; pulado no 3.13 (cai pro mss)
-mss>=9.0.1                                     # fallback Python puro, qualquer versão
+# Captura de tela (a fábrica escolhe: DXGI -> WGC -> mss)
+bettercam==1.0.0 ; python_version < "3.13"   # DXGI rápido; pulado no 3.13
+windows-capture>=2.0.0 ; sys_platform == "win32"  # Windows Graphics Capture: pega DX12/OpenGL, roda no 3.13
+mss>=9.0.1                                     # fallback Python puro/GDI (não captura DX12)
 
 # Visão computacional
 opencv-python>=4.10.0

@@ -28,9 +28,10 @@ já têm o ponto de extensão — veja o [Roadmap](#roadmap).
 ## Requisitos
 
 - **Windows** (usa SendInput, foco de janela, DXGI).
-- **Python 3.12 ou 3.13** — qualquer um serve. No **3.13** (mais comum hoje) só não instala o
-  `bettercam` (captura DXGI rápida); cai automaticamente no `mss` (Python puro, ~30-60 FPS),
-  suficiente para auto-heal/targeting/loot. O 3.12 é opcional e só agrega o `bettercam`.
+- **Python 3.12 ou 3.13** — qualquer um serve. A captura escolhe sozinha o melhor backend
+  disponível: **DXGI/bettercam** (só 3.12) → **WGC/Windows Graphics Capture** (roda no 3.13 e
+  **captura DX11/DX12/OpenGL**) → **mss** (GDI puro, último recurso). O `mss` **não** lê
+  surfaces de GPU (cliente em DX12 vem preto), por isso no 3.13 o **WGC** é quem resolve.
 - **Rodar o terminal como Administrador** (hotkeys globais F11/F12 e para o SendInput chegar
   no cliente Tibia, que costuma rodar elevado).
 
@@ -137,7 +138,7 @@ têm um campo `ativo` para ligar/desligar.
 ```
 executar.py / calibrar.py        # entrypoints
 src/bot/
-  captura/    base · dxgi · mss_fallback · fabrica
+  captura/    base · dxgi · wgc · mss_fallback · fabrica
   visao/      barra_recursos · lista_batalha · anotador · tipos
   decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque)
   telemetria/ eventos · barramento · estatisticas
@@ -145,7 +146,7 @@ src/bot/
   nucleo/     loop_bot · estado_execucao · seguranca
   painel/     servidor · ponte · web/(index.html, painel.js, painel.css)
   ferramentas/seletor_regiao
-tests/                           # 48 testes offline (não precisam do jogo)
+tests/                           # 51 testes offline (não precisam do jogo)
 ```
 
 ## Testes
@@ -185,12 +186,15 @@ gerida no portal.
 
 ## Troubleshooting
 
-- **Tela PRETA na calibração / bot não enxerga o jogo** → o Tibia está em **tela cheia
-  exclusiva**, que bloqueia a captura de tela. Em **Options → Graphics**, **desligue
-  'Full screen mode'** e use **janela (de preferência sem bordas/borderless)**; posicione a
-  janela e rode `calibrar.py` de novo. O `calibrar.py` salva o print em
-  `dados/capturas/calibracao_screenshot.png` e avisa quando a captura vem preta — abra esse
-  PNG para confirmar o que foi capturado.
+- **Tela PRETA na calibração / bot não enxerga o jogo** → captura voltando preta. Duas causas:
+  1. **Cliente em DX12/OpenGL + backend `mss`** (GDI não lê GPU). No 3.13 o backend **WGC**
+     resolve — confirme no log de inicialização "backend WGC ... ativo". Se aparecer "mss",
+     instale a lib: `pip install windows-capture`, ou force `backend: wgc` no `config.yaml`.
+  2. **Tela cheia EXCLUSIVA** derrota até WGC/DXGI (ignora o compositor do Windows). Em
+     **Options → Graphics**, desligue **Full screen mode** e use **janela / sem bordas**.
+
+  O `calibrar.py` salva o print em `dados/capturas/calibracao_screenshot.png` e avisa quando
+  a captura vem preta — abra esse PNG para confirmar o que foi capturado.
 - **Tecla não chega no jogo** → rode o terminal como **Administrador**; confirme o `backend`
   e as hotkeys do `config.yaml` iguais às do cliente.
 - **Hotkeys F11/F12 não funcionam** → idem (admin).

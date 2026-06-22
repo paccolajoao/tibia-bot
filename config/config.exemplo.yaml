@@ -2,7 +2,10 @@
 # As regiões (hp/mana) são preenchidas pela calibração; não edite à mão.
 
 captura:
-  backend: auto        # auto | bettercam | mss
+  backend: auto        # auto | bettercam | wgc | mss
+                       #   auto: tenta DXGI -> WGC -> mss
+                       #   wgc:  Windows Graphics Capture — pega DX12/OpenGL no Python 3.13
+                       #   mss:  GDI puro — NÃO captura DX12 (vem preto)
   monitor: 0           # índice do monitor (0 = primário)
   fps_alvo: 15         # ticks por segundo do loop do bot
 
