@@ -139,10 +139,84 @@ def _capturar_screenshot(
     except Exception as e:
         print(f"[cap] WGC falhou: {e}")
 
-    # 4. Screenshot interno do Tibia (WDA_EXCLUDEFROMCAPTURE ativo)
+    # 4. PrintWindow(PW_RENDERFULLCONTENT) — pede à janela que se renderize num DC próprio
+    #    Captura o CLIENTE INTEIRO (HUD, barras, battle list) mesmo com WDA ativo em alguns setups
+    resultado = _capturar_print_window()
+    if resultado is not None:
+        return resultado
+
+    # 5. Screenshot interno do Tibia (WDA_EXCLUDEFROMCAPTURE ativo) — só captura viewport
     print("\n[cap] Todos os métodos diretos retornaram preto.")
     print("[cap] Tibia usa proteção WDA_EXCLUDEFROMCAPTURE — usando hotkey de screenshot interno.")
     return _capturar_via_tibia_arquivo(hotkey_screenshot, pasta_screenshots)
+
+
+def _capturar_print_window() -> np.ndarray | None:
+    """Captura a janela do Tibia via PrintWindow(PW_RENDERFULLCONTENT).
+
+    Diferente de mss/WGC (leem do compositor DWM), PrintWindow envia WM_PRINT
+    diretamente para a janela. Com PW_RENDERFULLCONTENT pode capturar conteúdo
+    DX11 mesmo com WDA_EXCLUDEFROMCAPTURE ativo, e captura o cliente INTEIRO
+    (HUD, barras de HP/mana, battle list — não só o viewport do jogo).
+    """
+    try:
+        import win32gui
+        import win32ui
+        from ctypes import windll
+
+        # Encontra a janela do Tibia pela palavra no título
+        hwnd_encontrado: list[int] = []
+
+        def _cb(h, _):
+            titulo = win32gui.GetWindowText(h)
+            if "tibia" in titulo.lower() and win32gui.IsWindowVisible(h):
+                hwnd_encontrado.append(h)
+            return True
+
+        win32gui.EnumWindows(_cb, None)
+        if not hwnd_encontrado:
+            print("[cap] PrintWindow: janela do Tibia não encontrada.")
+            return None
+
+        hwnd = hwnd_encontrado[0]
+        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+        w, h = right - left, bottom - top
+        if w <= 0 or h <= 0:
+            return None
+
+        hwnd_dc = win32gui.GetWindowDC(hwnd)
+        mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
+        save_dc = mfc_dc.CreateCompatibleDC()
+        bmp = win32ui.CreateBitmap()
+        bmp.CreateCompatibleBitmap(mfc_dc, w, h)
+        save_dc.SelectObject(bmp)
+
+        PW_RENDERFULLCONTENT = 0x00000002
+        ok = windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), PW_RENDERFULLCONTENT)
+
+        info = bmp.GetInfo()
+        bits = bmp.GetBitmapBits(True)
+
+        win32gui.DeleteObject(bmp.GetHandle())
+        save_dc.DeleteDC()
+        mfc_dc.DeleteDC()
+        win32gui.ReleaseDC(hwnd, hwnd_dc)
+
+        if not ok:
+            print("[cap] PrintWindow retornou 0 (não suportado).")
+            return None
+
+        arr = np.frombuffer(bits, dtype=np.uint8).reshape(info["bmHeight"], info["bmWidth"], 4)
+        img = np.ascontiguousarray(arr[:, :, :3])  # BGRA → BGR (descarta alfa)
+
+        media = float(img.mean())
+        print(f"[cap] PrintWindow: {w}x{h}  média={media:.1f}  max={float(img.max()):.0f}")
+        if media > 15:
+            return img
+        print("[cap] PrintWindow: imagem preta — WDA bloqueia este caminho também.")
+    except Exception as e:
+        print(f"[cap] PrintWindow falhou: {e}")
+    return None
 
 
 def _capturar_via_tibia_arquivo(hotkey: str, pasta_str: str) -> np.ndarray | None:
