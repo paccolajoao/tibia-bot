@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pathlib
 import sys
+import time
 
 import cv2
 
@@ -17,6 +18,39 @@ from bot.configuracao import carregar_config, salvar_config  # noqa: E402
 from bot.ferramentas.seletor_regiao import selecionar_regiao  # noqa: E402
 from bot.visao.barra_recursos import ler_percentual_barra  # noqa: E402
 from bot.visao.lista_batalha import detectar_criaturas  # noqa: E402
+
+
+def _focar_tibia(titulo_contains: str) -> bool:
+    """Tenta trazer a janela do Tibia para a frente (best-effort, via pygetwindow)."""
+    try:
+        import pygetwindow as gw
+
+        alvos = [w for w in gw.getAllWindows() if titulo_contains.lower() in (w.title or "").lower()]
+        for w in alvos:
+            try:
+                if getattr(w, "isMinimized", False):
+                    w.restore()
+                w.activate()
+                return True
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return False
+
+
+def _aguardar_jogo_na_frente(titulo_contains: str, segundos: int = 4) -> None:
+    """Foca o Tibia e dá uma contagem para a janela aparecer antes de capturar."""
+    print("\n>>> Deixe o TIBIA em JANELA / SEM BORDAS (NÃO tela cheia exclusiva, NÃO minimizado).")
+    if _focar_tibia(titulo_contains):
+        print(">>> Tibia trazido para a frente.")
+    else:
+        print(">>> Não consegui focar o Tibia — CLIQUE na janela dele AGORA.")
+    print(">>> Capturando em:", end=" ", flush=True)
+    for i in range(segundos, 0, -1):
+        print(f"{i}...", end=" ", flush=True)
+        time.sleep(1)
+    print("já!")
 
 
 def _salvar_e_diagnosticar(img) -> bool:
@@ -35,15 +69,14 @@ def _salvar_e_diagnosticar(img) -> bool:
     print(f"[diag] print salvo em: {caminho}  (abra para ver o que o bot capturou)")
 
     if brilho_max < 12:  # tudo preto
-        print("\n*** A CAPTURA VEIO PRETA — o bot não está enxergando o jogo. ***")
-        print("Causa nº1: Tibia em TELA CHEIA EXCLUSIVA bloqueia a captura de tela.")
-        print("Solução:")
-        print("  1. No Tibia: Options -> Graphics -> DESLIGUE 'Full screen mode'")
-        print("     (use JANELA, de preferência 'sem bordas'/borderless).")
-        print("  2. Posicione/maximize a janela onde ela vai ficar.")
-        print("  3. Rode de novo: python calibrar.py")
-        print("Se mesmo em janela vier preto: confira se o Tibia está no monitor PRIMÁRIO")
-        print("(captura.monitor=0) e veja o PNG salvo acima.")
+        print("\n*** A CAPTURA VEIO PRETA — o jogo não estava VISÍVEL na tela. ***")
+        print("O bot fotografa o monitor; se o Tibia não está pintado nele, vem preto. Cheque:")
+        print("  1. O Tibia NÃO pode estar minimizado nem atrás do terminal — deixe-o VISÍVEL.")
+        print("  2. Use JANELA / SEM BORDAS (Options -> Graphics -> 'Full screen mode' OFF).")
+        print("     Tela cheia EXCLUSIVA fica preta para qualquer captura (até WGC/DXGI).")
+        print("  3. Tibia no monitor PRIMÁRIO (captura.monitor=0).")
+        print("  4. Rode de novo: python calibrar.py — e na contagem, clique no Tibia.")
+        print("Abra o PNG salvo acima para ver exatamente o que foi capturado.")
         return False
     return True
 
@@ -55,7 +88,11 @@ def main() -> int:
 
     cfg = carregar_config()
     cap = criar_capturador(cfg.captura.backend, cfg.captura.monitor, lambda m: print("[cap]", m))
-    frame = cap.capturar(None)  # tela cheia
+
+    # o terminal está na frente agora; traz o Tibia pra frente e dá tempo de aparecer
+    _aguardar_jogo_na_frente(cfg.seguranca.titulo_janela_contains)
+
+    frame = cap.capturar(None)  # tela cheia (pega o frame mais recente: o Tibia visível)
     cap.parar()
     if frame is None:
         print("Falha ao capturar a tela.")
