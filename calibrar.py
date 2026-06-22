@@ -68,15 +68,13 @@ def _salvar_e_diagnosticar(img) -> bool:
     print(f"\n[diag] captura {largura}x{altura}  | brilho max={brilho_max:.0f}  média={float(img.mean()):.1f}")
     print(f"[diag] print salvo em: {caminho}  (abra para ver o que o bot capturou)")
 
-    if brilho_max < 12:  # tudo preto
-        print("\n*** A CAPTURA VEIO PRETA — o jogo não estava VISÍVEL na tela. ***")
-        print("O bot fotografa o monitor; se o Tibia não está pintado nele, vem preto. Cheque:")
-        print("  1. O Tibia NÃO pode estar minimizado nem atrás do terminal — deixe-o VISÍVEL.")
-        print("  2. Use JANELA / SEM BORDAS (Options -> Graphics -> 'Full screen mode' OFF).")
-        print("     Tela cheia EXCLUSIVA fica preta para qualquer captura (até WGC/DXGI).")
-        print("  3. Tibia no monitor PRIMÁRIO (captura.monitor=0).")
-        print("  4. Rode de novo: python calibrar.py — e na contagem, clique no Tibia.")
-        print("Abra o PNG salvo acima para ver exatamente o que foi capturado.")
+    media = float(img.mean())
+    # Limiar de média: apenas taskbar ~4, jogo real (mesmo dungeon escuro) > 15
+    if media < 15:
+        print("\n*** CAPTURA INÚTIL — conteúdo do jogo não está visível (média muito baixa). ***")
+        print("O Tibia provavelmente usa WDA_EXCLUDEFROMCAPTURE (proteção de tela).")
+        print("Use 'backend: tibia_arquivo' no config.yaml + hotkey_screenshot configurada.")
+        print("Abra o PNG salvo acima para confirmar.")
         return False
     return True
 
@@ -91,19 +89,26 @@ def _capturar_screenshot(
     mss/PIL/WGC funcionam quando o Tibia NÃO usa WDA_EXCLUDEFROMCAPTURE.
     tibia_arquivo é o fallback para quando o Tibia bloqueia toda captura externa.
     """
-    # 1. mss (GDI via DWM — funciona para windowed DX11 visível)
-    try:
-        import mss
+    def _util(arr: np.ndarray, nome: str) -> np.ndarray | None:
+        """Retorna arr se a média indicar conteúdo real de jogo (> 15); loga e retorna None senão."""
+        media = float(arr.mean())
+        print(f"[cap] {nome}: {arr.shape[1]}x{arr.shape[0]}  média={media:.1f}  max={float(arr.max()):.0f}")
+        if media > 15:
+            return arr
+        print(f"[cap] {nome}: média muito baixa — jogo bloqueado (WDA_EXCLUDEFROMCAPTURE?) — próximo método…")
+        return None
 
-        with mss.mss() as sct:
-            mon = sct.monitors[monitor_idx + 1]  # 1-based; +1 converte 0-based
+    # 1. mss (GDI via DWM)
+    try:
+        import mss as _mss
+
+        with _mss.MSS() as sct:
+            mon = sct.monitors[monitor_idx + 1]
             shot = sct.grab(mon)
             arr = np.ascontiguousarray(np.asarray(shot)[:, :, :3])
-        brilho = float(arr.max())
-        print(f"[cap] mss: {arr.shape[1]}x{arr.shape[0]}  brilho max={brilho:.0f}")
-        if brilho > 12:
-            return arr
-        print("[cap] mss retornou preto — tentando PIL…")
+        resultado = _util(arr, "mss")
+        if resultado is not None:
+            return resultado
     except Exception as e:
         print(f"[cap] mss falhou: {e}")
 
@@ -113,11 +118,9 @@ def _capturar_screenshot(
 
         pil = ImageGrab.grab(all_screens=False)
         arr = cv2.cvtColor(np.asarray(pil), cv2.COLOR_RGB2BGR)
-        brilho = float(arr.max())
-        print(f"[cap] PIL: {arr.shape[1]}x{arr.shape[0]}  brilho max={brilho:.0f}")
-        if brilho > 12:
-            return arr
-        print("[cap] PIL também retornou preto — tentando WGC…")
+        resultado = _util(arr, "PIL")
+        if resultado is not None:
+            return resultado
     except Exception as e:
         print(f"[cap] PIL falhou: {e}")
 
@@ -130,12 +133,9 @@ def _capturar_screenshot(
         frame = cap.capturar(None)
         cap.parar()
         if frame is not None:
-            arr = frame.imagem
-            brilho = float(arr.max())
-            print(f"[cap] WGC: {arr.shape[1]}x{arr.shape[0]}  brilho max={brilho:.0f}")
-            if brilho > 12:
-                return arr
-            print("[cap] WGC também retornou preto.")
+            resultado = _util(frame.imagem, "WGC")
+            if resultado is not None:
+                return resultado
     except Exception as e:
         print(f"[cap] WGC falhou: {e}")
 
