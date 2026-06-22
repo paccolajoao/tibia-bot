@@ -185,6 +185,12 @@ gerida no portal.
 
 ## Troubleshooting
 
+- **Tela PRETA na calibração / bot não enxerga o jogo** → o Tibia está em **tela cheia
+  exclusiva**, que bloqueia a captura de tela. Em **Options → Graphics**, **desligue
+  'Full screen mode'** e use **janela (de preferência sem bordas/borderless)**; posicione a
+  janela e rode `calibrar.py` de novo. O `calibrar.py` salva o print em
+  `dados/capturas/calibracao_screenshot.png` e avisa quando a captura vem preta — abra esse
+  PNG para confirmar o que foi capturado.
 - **Tecla não chega no jogo** → rode o terminal como **Administrador**; confirme o `backend`
   e as hotkeys do `config.yaml` iguais às do cliente.
 - **Hotkeys F11/F12 não funcionam** → idem (admin).
