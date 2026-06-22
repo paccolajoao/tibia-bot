@@ -28,9 +28,9 @@ já têm o ponto de extensão — veja o [Roadmap](#roadmap).
 ## Requisitos
 
 - **Windows** (usa SendInput, foco de janela, DXGI).
-- **Python 3.12 recomendado.** No **3.13** funciona também — só não instala o `bettercam`
-  (captura DXGI rápida); cai automaticamente no `mss` (Python puro, ~30-60 FPS), suficiente
-  para auto-heal.
+- **Python 3.12 ou 3.13** — qualquer um serve. No **3.13** (mais comum hoje) só não instala o
+  `bettercam` (captura DXGI rápida); cai automaticamente no `mss` (Python puro, ~30-60 FPS),
+  suficiente para auto-heal/targeting/loot. O 3.12 é opcional e só agrega o `bettercam`.
 - **Rodar o terminal como Administrador** (hotkeys globais F11/F12 e para o SendInput chegar
   no cliente Tibia, que costuma rodar elevado).
 
@@ -38,9 +38,16 @@ já têm o ponto de extensão — veja o [Roadmap](#roadmap).
 
 ```powershell
 # na raiz do projeto (c:\dev\bot-tibia)
-py -3.12 -m venv .venv          # ou: py -3.13 -m venv .venv
+py -3.13 -m venv .venv          # ou: py -3.12 -m venv .venv (se tiver o 3.12)
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
+
+> **O Python 3.12 é OPCIONAL.** Se você só tem o 3.13, use `py -3.13` e ignore o 3.12 — o
+> bot roda igual via `mss`. Se rodar `py -3.12` sem ter o 3.12 instalado, o Windows mostra
+> **`No suitable Python runtime found`** — não é erro do projeto, é só o 3.12 ausente. A
+> única coisa que o 3.12 acrescenta é o `bettercam` (captura DXGI ~240 FPS), **desnecessário
+> para auto-heal/targeting/loot**. Para tê-lo depois: `winget install Python.Python.3.12`,
+> recrie a venv com `py -3.12 -m venv .venv` e reinstale os requirements.
 
 Para desenvolver/testar, use `requirements-dev.txt` (inclui pytest).
 
