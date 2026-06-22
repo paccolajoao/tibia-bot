@@ -1,0 +1,25 @@
+# Runtime — Bot Tibia (Windows). Python 3.12 recomendado; 3.13 funciona via mss.
+
+# Captura de tela
+bettercam==1.0.0 ; python_version < "3.13"   # DXGI rápido; pulado no 3.13 (cai pro mss)
+mss>=9.0.1                                     # fallback Python puro, qualquer versão
+
+# Visão computacional
+opencv-python>=4.10.0
+numpy>=2.1.0
+
+# Simulação de input (SendInput; funciona em jogos DirectX onde pyautogui falha)
+pydirectinput-rgx>=2.1.0
+
+# Dashboard web (uvicorn[standard] já traz websockets/httptools)
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# Config
+PyYAML>=6.0.2
+pydantic>=2.9.0
+
+# Windows: hotkeys globais + foco de janela
+keyboard>=0.13.5
+pygetwindow>=0.0.9
+pywin32>=308

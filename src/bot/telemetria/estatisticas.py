@@ -1,0 +1,46 @@
+"""Estatísticas acumuladas da sessão (mutadas só pela thread do bot)."""
+
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Estatisticas:
+    inicio_ts: float = field(default_factory=time.perf_counter)
+    curas: int = 0  # curas de HP disparadas (forte + leve)
+    pocoes_mana: int = 0
+    ataques: int = 0  # cliques de ataque na battle list
+    refeicoes: int = 0  # presses de comida
+    saques: int = 0  # presses de Quick Loot
+    _fps_ema: float = 0.0
+
+    def registrar_acao(self, decisao) -> None:
+        """Contabiliza uma ação executada, separando por `decisao.dados['recurso']`."""
+        recurso = decisao.dados.get("recurso")
+        if recurso == "mana":
+            self.pocoes_mana += 1
+        elif recurso == "alvo":
+            self.ataques += 1
+        elif recurso == "comida":
+            self.refeicoes += 1
+        elif recurso == "saque":
+            self.saques += 1
+        else:
+            self.curas += 1
+
+    def atualizar_fps(self, fps_instantaneo: float) -> None:
+        alfa = 0.1
+        if self._fps_ema <= 0.0:
+            self._fps_ema = fps_instantaneo
+        else:
+            self._fps_ema = (1 - alfa) * self._fps_ema + alfa * fps_instantaneo
+
+    @property
+    def fps_medio(self) -> float:
+        return self._fps_ema
+
+    @property
+    def uptime_s(self) -> float:
+        return time.perf_counter() - self.inicio_ts

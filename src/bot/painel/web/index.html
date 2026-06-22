@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bot Tibia — Painel</title>
+  <link rel="stylesheet" href="/static/painel.css" />
+</head>
+<body>
+  <header class="topo">
+    <h1>🤖 Bot Tibia <span class="sub">painel ao vivo</span></h1>
+    <div class="badges">
+      <span id="badge-estado" class="badge">—</span>
+      <span id="badge-foco" class="badge">foco: —</span>
+      <span id="badge-backend" class="badge">captura: —</span>
+      <span id="badge-fps" class="badge">0 fps</span>
+      <span id="badge-conexao" class="badge badge-off">desconectado</span>
+    </div>
+    <div class="controles">
+      <button id="btn-pausar">⏸ Pausar</button>
+      <button id="btn-retomar">▶ Retomar</button>
+      <button id="btn-parar" class="perigo">⏹ Parar</button>
+    </div>
+  </header>
+
+  <main class="grade">
+    <section class="cartao recursos">
+      <h2>Recursos</h2>
+      <div class="barra-rotulo"><span>HP</span><span id="hp-valor">—</span></div>
+      <div class="barra"><div id="hp-preench" class="preench hp"></div></div>
+      <div class="barra-rotulo"><span>Mana</span><span id="mana-valor">—</span></div>
+      <div class="barra"><div id="mana-preench" class="preench mana"></div></div>
+      <p class="conf">confiança HP: <span id="hp-conf">—</span></p>
+    </section>
+
+    <section class="cartao decisao">
+      <h2>Decisão atual</h2>
+      <p class="dec-acao" id="dec-acao">—</p>
+      <p class="dec-motivo" id="dec-motivo">aguardando…</p>
+      <p class="dec-meta"><span id="dec-comp">—</span> · alvo <span id="dec-tecla">—</span></p>
+    </section>
+
+    <section class="cartao deteccao">
+      <h2>Detecção</h2>
+      <ul>
+        <li>Criaturas (battle list) <b id="det-criaturas">—</b></li>
+        <li>Alvo atual <b id="det-alvo">—</b></li>
+        <li>Confiança <b id="det-conf">—</b></li>
+      </ul>
+    </section>
+
+    <section class="cartao preview">
+      <h2>O que o bot vê</h2>
+      <img id="quadro" alt="preview anotado" />
+      <p class="dica">regiões + leituras anotadas (laranja = confiança baixa)</p>
+    </section>
+
+    <section class="cartao stats">
+      <h2>Estatísticas</h2>
+      <ul>
+        <li>Curas (HP) <b id="st-curas">0</b></li>
+        <li>Poções de mana <b id="st-mana">0</b></li>
+        <li>Ataques <b id="st-ataques">0</b></li>
+        <li>Refeições <b id="st-refeicoes">0</b></li>
+        <li>Saques <b id="st-saques">0</b></li>
+        <li>Uptime <b id="st-uptime">0s</b></li>
+        <li>FPS médio <b id="st-fps">0</b></li>
+        <li>Tick <b id="st-tick">0</b></li>
+      </ul>
+    </section>
+
+    <section class="cartao raciocinio">
+      <h2>O que o bot está pensando</h2>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+
+  <script src="/static/painel.js"></script>
+</body>
+</html>

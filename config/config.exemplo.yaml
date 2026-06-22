@@ -1,0 +1,69 @@
+# Copie para config.yaml — ou rode `python calibrar.py`, que cria/atualiza config.yaml.
+# As regiões (hp/mana) são preenchidas pela calibração; não edite à mão.
+
+captura:
+  backend: auto        # auto | bettercam | mss
+  monitor: 0           # índice do monitor (0 = primário)
+  fps_alvo: 15         # ticks por segundo do loop do bot
+
+regioes:               # [left, top, right, bottom] em pixels absolutos do desktop
+  hp: [0, 0, 0, 0]            # preenchido por calibrar.py
+  mana: [0, 0, 0, 0]         # preenchido por calibrar.py
+  battle_list: [0, 0, 0, 0]  # opcional; preenchido por calibrar.py -> habilita targeting
+
+visao:
+  confianca_minima: 0.6   # abaixo disso o bot ignora a leitura (evita curar errado)
+  hp:                     # classificador de pixel "preenchido" (HSV)
+    v_min: 60             # brilho (Value) mínimo
+    s_min: 50             # saturação mínima
+  mana:
+    v_min: 60
+    s_min: 50
+
+cura:
+  hp_critico: 35          # HP% <= -> cura forte
+  hp_baixo: 60            # HP% <= -> cura leve
+  mana_baixa: 40          # Mana% <= -> poção de mana
+  tecla_cura_forte: f5
+  tecla_cura_leve: f6
+  tecla_pocao_mana: f1
+  cooldown_s:             # intervalo mínimo entre disparos da MESMA tecla (anti-spam)
+    f5: 1.0
+    f6: 1.0
+    f1: 1.0
+
+alvo:                     # targeting — só ativa se regioes.battle_list estiver calibrada
+  prioridade: 80          # abaixo de cura (100): sobreviver antes de atacar
+  confianca_minima: 0.6
+  s_min: 60               # saturação mín. do mini HP-bar da criatura na battle list
+  v_min: 60               # brilho mín.
+  cooldown_s:
+    atacar: 2.0           # intervalo mínimo entre cliques de ataque
+
+comer:                    # auto-comer por tempo (o Tibia ignora se já está cheio)
+  ativo: true
+  tecla: f7               # hotkey de comida bindada no Tibia
+  intervalo_s: 120        # come a cada N segundos
+  prioridade: 10          # mais baixa: cura/ataque/saque vêm antes
+
+saque:                    # auto-loot via Quick Loot do Tibia (só com battle list calibrada)
+  ativo: true             # a FILTRAGEM de itens fica nas loot lists do Tibia
+  tecla: f4               # hotkey de Quick Loot bindada no Tibia
+  confianca_minima: 0.6
+  janela_s: 3.0           # após um kill, tenta saquear por esta janela
+  intervalo_press_s: 1.0  # intervalo entre presses dentro da janela
+  prioridade: 60          # abaixo de alvo (80), acima de comer (10)
+
+entrada:
+  atraso_pre_ms: [40, 90]   # jitter humano antes de apertar a tecla
+  atraso_pos_ms: [30, 70]   # jitter humano depois
+
+seguranca:
+  hotkey_pausar: f11        # pausa/retoma (hotkey global; requer admin)
+  hotkey_panico: f12        # para o bot imediatamente
+  titulo_janela_contains: Tibia   # auto-pause se a janela ativa não contiver isto
+
+painel:
+  host: 127.0.0.1
+  port: 8000
+  fps_quadro: 6             # frames/seg do preview anotado enviado ao navegador

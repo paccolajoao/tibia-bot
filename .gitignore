@@ -1,0 +1,36 @@
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Config real (gerado pela calibração; contém regiões da SUA tela)
+config/config.yaml
+
+# Saídas locais
+dados/capturas/
+dados/templates/
+*.log
+
+# Caches de ferramentas
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.swp
+
+# SO
+.DS_Store
+Thumbs.db
