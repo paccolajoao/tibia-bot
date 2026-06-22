@@ -106,6 +106,9 @@ class LoopBot(threading.Thread):
         # rastreio de mortes p/ o auto-loot (Saque lê via estado_comportamentos)
         self._saque_conf_min = cfg.saque.confianca_minima
         self._ultimo_n_criaturas: int | None = None
+        # detecção de frames pretos (backend WGC retornando preto para DX11 Blt-model)
+        self._ticks_sem_confianca = 0
+        self._fallback_mss_feito = False
 
     # ------------------------------------------------------------------ loop
     def run(self) -> None:
@@ -152,6 +155,8 @@ class LoopBot(threading.Thread):
             self.ctx.mana = ler_percentual_barra(
                 frame.imagem, reg_mana_img, cfg.visao.mana.v_min, cfg.visao.mana.s_min
             )
+
+            self._verificar_frames_pretos(t0)
 
             self.ctx.criaturas = self._detectar_battle_list(cfg)
             self._rastrear_mortes(self.ctx.criaturas, t0)
@@ -226,6 +231,52 @@ class LoopBot(threading.Thread):
         if self._ultimo_n_criaturas is not None and n < self._ultimo_n_criaturas:
             self.ctx.estado_comportamentos["saque_morte_ts"] = ts
         self._ultimo_n_criaturas = n
+
+    def _verificar_frames_pretos(self, ts: float) -> None:
+        """Detecta se o backend está retornando frames sem conteúdo útil.
+
+        Se HP e mana ficarem com confiança zero por ~2 s consecutivos (30 ticks
+        a 15 FPS), é sinal de que o backend não está capturando o Tibia — comum
+        com WGC + DX11 Blt-model. Tenta trocar para mss automaticamente.
+        """
+        hp, mana = self.ctx.hp, self.ctx.mana
+        sem_dados = (hp is None or hp.confianca < 0.05) and (mana is None or mana.confianca < 0.05)
+        if sem_dados:
+            self._ticks_sem_confianca += 1
+        else:
+            self._ticks_sem_confianca = 0
+            return
+
+        if self._ticks_sem_confianca != 30 or self._fallback_mss_feito:
+            return
+
+        backend_atual = getattr(self.cap, "nome_backend", "?")
+        self.bus.publicar(
+            ev.LinhaRaciocinio(
+                ts,
+                self.ctx.tick,
+                f"AVISO: {self._ticks_sem_confianca} ticks sem dados "
+                f"(backend '{backend_atual}' não está capturando o Tibia). "
+                "Trocando para mss (GDI/DWM — funciona para DX11 windowed)...",
+                "alerta",
+            )
+        )
+        try:
+            from bot.captura.mss_fallback import CapturadorMSS
+
+            novo = CapturadorMSS(monitor=self.ctx.config.captura.monitor)
+            novo.iniciar()
+            self.cap.parar()
+            self.cap = novo
+            self._fallback_mss_feito = True
+            self.bus.publicar(
+                ev.LinhaRaciocinio(ts, self.ctx.tick, "Backend trocado para mss — certifique-se de que o Tibia está visível.", "info")
+            )
+        except Exception as err:
+            self._fallback_mss_feito = True  # não tenta de novo
+            self.bus.publicar(
+                ev.LinhaRaciocinio(ts, self.ctx.tick, f"Falha ao trocar para mss: {err} — altere 'backend: mss' no config.yaml", "alerta")
+            )
 
     # ----------------------------------------------------------- telemetria
     def _publicar_estado(self) -> None:

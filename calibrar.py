@@ -10,10 +10,10 @@ import sys
 import time
 
 import cv2
+import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent / "src"))
 
-from bot.captura.fabrica import criar_capturador  # noqa: E402
 from bot.configuracao import carregar_config, salvar_config  # noqa: E402
 from bot.ferramentas.seletor_regiao import selecionar_regiao  # noqa: E402
 from bot.visao.barra_recursos import ler_percentual_barra  # noqa: E402
@@ -81,24 +81,80 @@ def _salvar_e_diagnosticar(img) -> bool:
     return True
 
 
+def _capturar_screenshot(monitor_idx: int = 0) -> np.ndarray | None:
+    """Captura a tela inteira tentando mss (GDI/DWM) → PIL ImageGrab → WGC.
+
+    Para janela DX11 visível, mss lê corretamente via DWM (GDI BitBlt).
+    PIL ImageGrab é o segundo fallback (Pillow precisa estar instalado).
+    WGC entra por último — em alguns setups DX11 Blt-model o WGC lê preto.
+    """
+    # 1. mss (GDI via DWM — funciona para windowed DX11 visível)
+    try:
+        import mss
+
+        with mss.mss() as sct:
+            mon = sct.monitors[monitor_idx + 1]  # 1-based; +1 converte 0-based
+            shot = sct.grab(mon)
+            arr = np.ascontiguousarray(np.asarray(shot)[:, :, :3])
+        brilho = float(arr.max())
+        print(f"[cap] mss: {arr.shape[1]}x{arr.shape[0]}  brilho max={brilho:.0f}")
+        if brilho > 12:
+            return arr
+        print("[cap] mss retornou preto — tentando PIL…")
+    except Exception as e:
+        print(f"[cap] mss falhou: {e}")
+
+    # 2. PIL ImageGrab (GDI alternativo)
+    try:
+        from PIL import ImageGrab
+
+        pil = ImageGrab.grab(all_screens=False)
+        arr = cv2.cvtColor(np.asarray(pil), cv2.COLOR_RGB2BGR)
+        brilho = float(arr.max())
+        print(f"[cap] PIL: {arr.shape[1]}x{arr.shape[0]}  brilho max={brilho:.0f}")
+        if brilho > 12:
+            return arr
+        print("[cap] PIL também retornou preto — tentando WGC…")
+    except Exception as e:
+        print(f"[cap] PIL falhou: {e}")
+
+    # 3. WGC (último recurso)
+    try:
+        from bot.captura.wgc import CapturadorWGC
+
+        cap = CapturadorWGC(monitor=monitor_idx)
+        cap.iniciar()
+        frame = cap.capturar(None)
+        cap.parar()
+        if frame is not None:
+            arr = frame.imagem
+            brilho = float(arr.max())
+            print(f"[cap] WGC: {arr.shape[1]}x{arr.shape[0]}  brilho max={brilho:.0f}")
+            if brilho > 12:
+                return arr
+            print("[cap] WGC também retornou preto.")
+    except Exception as e:
+        print(f"[cap] WGC falhou: {e}")
+
+    return None
+
+
 def main() -> int:
     print("=== Calibração do Bot Tibia ===")
-    print("1) Abra o Tibia e deixe as barras de HP e Mana visíveis.")
+    print("1) Abra o Tibia em MODO JANELA (Full Screen OFF) e deixe as barras visíveis.")
     print("2) Uma captura da tela vai abrir; arraste um retângulo sobre cada barra.\n")
 
     cfg = carregar_config()
-    cap = criar_capturador(cfg.captura.backend, cfg.captura.monitor, lambda m: print("[cap]", m))
 
     # o terminal está na frente agora; traz o Tibia pra frente e dá tempo de aparecer
     _aguardar_jogo_na_frente(cfg.seguranca.titulo_janela_contains)
 
-    frame = cap.capturar(None)  # tela cheia (pega o frame mais recente: o Tibia visível)
-    cap.parar()
-    if frame is None:
-        print("Falha ao capturar a tela.")
+    img = _capturar_screenshot(cfg.captura.monitor)
+    if img is None:
+        print("\n*** Todos os métodos retornaram preto. ***")
+        print("Certifique-se de que o Tibia está em MODO JANELA e visível na tela.")
         return 1
 
-    img = frame.imagem
     if not _salvar_e_diagnosticar(img):
         return 1
 
