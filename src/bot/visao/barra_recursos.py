@@ -43,10 +43,19 @@ def ler_percentual_barra(
     total = int(preenchido.size)
     n_preench = int(preenchido.sum())
 
-    # percentual = posição da última amostra preenchida (barras esvaziam da direita p/ esquerda)
+    # Barras enchem da esquerda p/ direita; o percentual é a posição do primeiro
+    # pixel vazio após a região preenchida inicial. Usar o ÚLTIMO preenchido
+    # é sensível a pixels espúrios de borda (frame da UI) que inflariam p/ 100%.
     if n_preench == 0:
         percentual = 0.0
+    elif n_preench == total:
+        percentual = 100.0
+    elif preenchido[0]:
+        # caso normal: barra começa preenchida; primeiro vazio = fim do preenchimento
+        idx_corte = int(np.flatnonzero(~preenchido)[0])
+        percentual = idx_corte / total * 100.0
     else:
+        # barra começa vazia (raro, p.ex. região calibrada inclui área antes da barra)
         idx_ultimo = int(np.max(np.flatnonzero(preenchido)))
         percentual = (idx_ultimo + 1) / total * 100.0
 

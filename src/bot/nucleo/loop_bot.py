@@ -220,6 +220,12 @@ class LoopBot(threading.Thread):
             elif dec.acao == TipoAcao.CLICAR and dec.ponto:
                 self.entrada.clicar(*dec.ponto)
                 executou = True
+                if dec.dados.get("recurso") == "alvo":
+                    self.bus.publicar(ev.LinhaRaciocinio(
+                        t0, self.ctx.tick,
+                        f"[alvo] clique em screen={dec.ponto}  battle_list={self._reg_battle}",
+                        "info",
+                    ))
             if executou:
                 self.motor.confirmar_acao(dec, t0)
                 self.ctx.estatisticas.registrar_acao(dec)

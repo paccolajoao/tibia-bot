@@ -14,8 +14,8 @@ import numpy as np
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent / "src"))
 
-from bot.configuracao import carregar_config, salvar_config  # noqa: E402
 from bot.ferramentas.seletor_regiao import selecionar_regiao  # noqa: E402
+from bot.persistencia import carregar_config_ativa, salvar_config_ativa  # noqa: E402
 from bot.visao.barra_recursos import ler_percentual_barra  # noqa: E402
 from bot.visao.lista_batalha import detectar_criaturas  # noqa: E402
 
@@ -199,9 +199,10 @@ def _capturar_print_window() -> np.ndarray | None:
     (HUD, barras de HP/mana, battle list — não só o viewport do jogo).
     """
     try:
+        from ctypes import windll
+
         import win32gui
         import win32ui
-        from ctypes import windll
 
         # Encontra a janela do Tibia pela palavra no título
         hwnd_encontrado: list[int] = []
@@ -260,8 +261,13 @@ def _capturar_print_window() -> np.ndarray | None:
 
 def _capturar_via_tibia_arquivo(hotkey: str, pasta_str: str) -> np.ndarray | None:
     """Envia a hotkey de screenshot do Tibia e aguarda o arquivo aparecer."""
-    from bot.captura.tibia_arquivo import _arquivo_mais_novo, _hotkey_send, detectar_pasta_screenshots
     import pathlib
+
+    from bot.captura.tibia_arquivo import (
+        _arquivo_mais_novo,
+        _hotkey_send,
+        detectar_pasta_screenshots,
+    )
 
     pasta = pathlib.Path(pasta_str) if pasta_str else detectar_pasta_screenshots()
     if pasta is None or not pasta.is_dir():
@@ -346,7 +352,7 @@ def main() -> int:
     print("1) Abra o Tibia em MODO JANELA (Full Screen OFF) e deixe as barras visíveis.")
     print("2) Uma captura da tela vai abrir; arraste um retângulo sobre cada barra.\n")
 
-    cfg = carregar_config()
+    cfg = carregar_config_ativa()
 
     # o terminal está na frente agora; traz o Tibia pra frente e dá tempo de aparecer
     _aguardar_jogo_na_frente(cfg.seguranca.titulo_janela_contains)
@@ -404,9 +410,9 @@ def main() -> int:
     if cfg.captura.backend == "obs":
         _configurar_mapeamento_obs_na_calibracao(cfg, img)
 
-    salvar_config(cfg)
+    salvar_config_ativa(cfg)
 
-    print("\nCalibração salva em config/config.yaml.")
+    print("\nCalibração salva no perfil ativo (config/bot.db).")
     print("Confira os valores acima — se baterem com a tela, rode:  python executar.py")
     return 0
 

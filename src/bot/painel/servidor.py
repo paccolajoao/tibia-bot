@@ -1,9 +1,13 @@
-"""Servidor FastAPI do painel: serve o frontend e o WebSocket de telemetria.
+"""Servidor FastAPI do portal: API REST + frontend + WebSocket de telemetria.
 
-- GET /         -> index.html
-- /static/*     -> CSS/JS
-- WS /ws        -> recebe snapshot inicial + stream de eventos; aceita comandos
+- /api/*        -> API REST (perfis, config, regiões, calibração) — ver api.py
+- WS /ws        -> snapshot inicial + stream de eventos; aceita comandos
                    {cmd: pausar|retomar|parar} de volta (canal de controle).
+- /             -> SPA do portal (portal/dist) se buildado; senão cai no painel
+                   vanilla legado (src/bot/painel/web) para não quebrar nada.
+
+Em desenvolvimento, o frontend roda no Vite (porta 5173) com proxy de /api e /ws
+para cá; em produção, `npm run build` gera portal/dist e o FastAPI o serve.
 """
 
 from __future__ import annotations
@@ -16,16 +20,23 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from bot.configuracao import RAIZ_PROJETO
 from bot.nucleo.estado_execucao import ControladorExecucao, EstadoExecucao
+from bot.painel.api import criar_router_api
 from bot.painel.ponte import PonteAssincrona
 
-DIR_WEB = Path(__file__).parent / "web"
+DIR_WEB_LEGADO = Path(__file__).parent / "web"
+DIR_PORTAL = RAIZ_PROJETO / "portal" / "dist"
 
 _COMANDOS = {
     "pausar": EstadoExecucao.PAUSADO,
     "retomar": EstadoExecucao.RODANDO,
     "parar": EstadoExecucao.PARADO,
 }
+
+
+def _portal_buildado() -> bool:
+    return (DIR_PORTAL / "index.html").is_file()
 
 
 def criar_app(barramento, controlador: ControladorExecucao) -> FastAPI:
@@ -42,12 +53,8 @@ def criar_app(barramento, controlador: ControladorExecucao) -> FastAPI:
             ponte.parar()
             tarefa.cancel()
 
-    app = FastAPI(title="Bot Tibia — Painel", lifespan=lifespan)
-    app.mount("/static", StaticFiles(directory=str(DIR_WEB)), name="static")
-
-    @app.get("/")
-    async def index():
-        return FileResponse(str(DIR_WEB / "index.html"))
+    app = FastAPI(title="Bot Tibia — Portal", lifespan=lifespan)
+    app.include_router(criar_router_api(barramento))
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket):
@@ -72,4 +79,34 @@ def criar_app(barramento, controlador: ControladorExecucao) -> FastAPI:
         finally:
             clientes.discard(websocket)
 
+    _montar_frontend(app)
     return app
+
+
+def _montar_frontend(app: FastAPI) -> None:
+    """Serve a SPA do portal (se buildada) com fallback para qualquer rota; senão o painel legado."""
+    if _portal_buildado():
+        assets = DIR_PORTAL / "assets"
+        if assets.is_dir():
+            app.mount("/assets", StaticFiles(directory=str(assets)), name="assets")
+        indice = DIR_PORTAL / "index.html"
+
+        @app.get("/")
+        async def raiz():
+            return FileResponse(str(indice))
+
+        # SPA fallback: qualquer rota não-API/WS devolve o index (React Router cuida)
+        @app.get("/{caminho:path}")
+        async def spa(caminho: str):
+            arquivo = DIR_PORTAL / caminho
+            if arquivo.is_file():
+                return FileResponse(str(arquivo))
+            return FileResponse(str(indice))
+        return
+
+    # Fallback: painel vanilla legado enquanto o portal não foi buildado.
+    app.mount("/static", StaticFiles(directory=str(DIR_WEB_LEGADO)), name="static")
+
+    @app.get("/")
+    async def index_legado():
+        return FileResponse(str(DIR_WEB_LEGADO / "index.html"))

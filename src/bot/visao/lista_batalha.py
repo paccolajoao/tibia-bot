@@ -49,7 +49,11 @@ def detectar_criaturas(
     n = len(grupos)
 
     centro = _centro_primeira(saturado, grupos, roi.shape[1])
-    alvo = _tem_realce_vermelho(h, saturado, realce_min_frac)
+    # Verifica o realce por grupo individual (limiar menor: bordas têm poucos pixels)
+    alvo = any(
+        _tem_realce_vermelho(h[y0 : y1 + 1], saturado[y0 : y1 + 1], 0.005)
+        for y0, y1 in grupos
+    )
     confianca = _confianca(float(saturado.mean()))
     return DeteccaoCriaturas(n, alvo, confianca, centro)
 
@@ -84,8 +88,12 @@ def _centro_primeira(
 
 
 def _tem_realce_vermelho(h: np.ndarray, saturado: np.ndarray, realce_min_frac: float) -> bool:
-    """A entrada atacada tem realce vermelho — hue perto de 0/180, saturado."""
-    vermelho = ((h <= 10) | (h >= 170)) & saturado
+    """A entrada atacada tem realce vermelho — hue perto de 0/180, saturado.
+
+    Range alargado (<=20 / >=160) p/ capturar laranja-vermelho que o cliente Tibia
+    usa como indicador de alvo ativo; limiar mantido p/ não falso-positivo.
+    """
+    vermelho = ((h <= 20) | (h >= 160)) & saturado
     return bool(vermelho.mean() >= realce_min_frac)
 
 

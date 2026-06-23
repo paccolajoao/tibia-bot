@@ -32,13 +32,14 @@ def _snapshot():
     )
 
 
-def test_index_serve_secoes_novas():
+def test_index_serve_html():
+    # `/` serve a SPA do portal (portal/dist) se buildada, senão o painel legado.
+    # Ambos devem responder 200 com HTML.
     app = criar_app(BarramentoEventos(), ControladorExecucao())
     with TestClient(app) as client:
         r = client.get("/")
         assert r.status_code == 200
-        for marcador in ("Detec", "st-ataques", "st-refeicoes", "st-saques", "det-criaturas"):
-            assert marcador in r.text
+        assert "<html" in r.text.lower() or 'id="root"' in r.text
 
 
 def test_ws_entrega_snapshot_e_eventos():

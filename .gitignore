@@ -15,6 +15,14 @@ dist/
 
 # Config real (gerado pela calibração; contém regiões da SUA tela)
 config/config.yaml
+# Banco local de perfis/config (fonte única em runtime; dados da SUA máquina)
+config/bot.db
+config/bot.db-journal
+
+# Portal web (frontend): deps e build local (gere com `npm install && npm run build`)
+portal/node_modules/
+portal/dist/
+portal/*.tsbuildinfo
 
 # Saídas locais
 dados/capturas/

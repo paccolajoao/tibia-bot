@@ -52,6 +52,20 @@ py -3.13 -m venv .venv          # ou: py -3.12 -m venv .venv (se tiver o 3.12)
 
 Para desenvolver/testar, use `requirements-dev.txt` (inclui pytest).
 
+**Portal web (frontend).** Toda a configuração e calibração agora são feitas pelo **portal**
+(React + Tailwind + shadcn). Ele precisa ser buildado uma vez (requer **Node 18+**):
+
+```powershell
+cd portal
+npm install
+npm run build        # gera portal/dist (servido pelo executar.py)
+cd ..
+```
+
+O `executar.py` serve o `portal/dist` automaticamente em `http://127.0.0.1:8000`. Se você
+ainda **não** buildou, o servidor cai no painel legado (somente leitura). Para desenvolver o
+frontend com hot-reload: `npm run dev` (porta 5173, com proxy de `/api` e `/ws` para a 8000).
+
 ## Uso — passo a passo
 
 **1) Bindar as hotkeys NO Tibia** (uma vez). As teclas do bot precisam existir no cliente:
@@ -71,34 +85,40 @@ cliente está bloqueando a captura (`WDA_EXCLUDEFROMCAPTURE`) — siga o
 [passo a passo do OBS](#captura-via-obs-tibia-oficial--wda_excludefromcapture) e volte para a
 calibração. Em OT Server / cliente sem BattlEye, pule este passo (deixe `backend: auto`).
 
-**3) Calibrar** (uma vez, ou quando mudar o layout do cliente):
-
-```powershell
-.\.venv\Scripts\python.exe calibrar.py
-```
-
-Abre uma captura da tela; **arraste um retângulo sobre a barra de HP**, ENTER, depois
-**Mana**, ENTER, e por fim (opcional) a **battle list** — marcá-la **habilita targeting e
-auto-loot**; ESC pula. Ele imprime os valores lidos (confira) e salva as regiões em
-`config/config.yaml`.
-
-**4) Executar** (de preferência num terminal **Administrador**):
+**3) Executar** (de preferência num terminal **Administrador**):
 
 ```powershell
 .\.venv\Scripts\python.exe executar.py
 ```
 
-Abra o painel: **http://127.0.0.1:8000** — o log de inicialização diz quais módulos
-ficaram ativos (targeting/auto-loot só ligam se a battle list foi calibrada).
+Abra o **portal**: **http://127.0.0.1:8000**. Mesmo **sem calibração** o portal sobe — é por
+ele que você configura e calibra. (O log de inicialização diz quais módulos ficaram ativos;
+targeting/auto-loot só ligam se a battle list foi calibrada.)
+
+**4) Calibrar pelo portal** (uma vez, ou quando mudar o layout do cliente). Na aba
+**Calibração**: clique **Capturar frame**, **arraste um retângulo** sobre a barra de HP,
+depois a de Mana e, opcional, a **battle list** (habilita targeting/auto-loot). Clique
+**Salvar regiões** e **reinicie** o `executar.py` para aplicar.
+
+> Prefere linha de comando? O `calibrar.py` ainda existe e grava no mesmo perfil ativo
+> (`.\.venv\Scripts\python.exe calibrar.py`).
+
+> **Aplicar mudanças exige reiniciar o bot.** Config e calibração são salvas no perfil ativo
+> (SQLite) e passam a valer no próximo `executar.py`.
 
 ### Controles e segurança
 - **F11** — pausa/retoma. **F12** — pânico (para o input na hora).
 - **Auto-pause ao perder o foco** da janela do Tibia (volta sozinho quando você foca de novo).
 - Botões **Pausar/Retomar/Parar** também no painel.
 
-## Configuração — `config/config.yaml`
+## Configuração — pelo portal (perfis em SQLite)
 
-Gerado a partir de `config.exemplo.yaml` (veja os comentários lá). Principais campos:
+A configuração agora é **gerenciada pelo portal** e persistida em **SQLite** (`config/bot.db`),
+não mais editando YAML à mão. Cada **perfil** guarda um conjunto completo de config (ex.: um
+por personagem/caçada); a aba **Perfis** cria, ativa, duplica, renomeia e faz **import/export
+YAML**. Na 1ª execução, o `config.yaml` existente (ou `config.exemplo.yaml`) é migrado para um
+perfil "Padrão" automaticamente. A aba **Configurações** tem formulários validados para todas
+as seções abaixo:
 
 | Seção | Campo | O que faz |
 |---|---|---|
@@ -143,15 +163,18 @@ têm um campo `ativo` para ligar/desligar.
 ```
 executar.py / calibrar.py        # entrypoints
 src/bot/
-  captura/    base · dxgi · wgc · mss_fallback · obs_virtualcam · mapeamento · tibia_arquivo · fabrica
+  captura/    base · dxgi · wgc · mss_fallback · obs_virtualcam · mapeamento · tibia_arquivo · instantaneo · fabrica
   visao/      barra_recursos · lista_batalha · anotador · tipos
-  decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque)
+  decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque, usar_mana)
   telemetria/ eventos · barramento · estatisticas
   entrada/    teclado_directinput · atrasos · simulada
   nucleo/     loop_bot · estado_execucao · seguranca
-  painel/     servidor · ponte · web/(index.html, painel.js, painel.css)
+  persistencia/ banco · repo_perfis        # SQLite: perfis + config (fonte única)
+  painel/     servidor · api · ponte · web/(painel legado)
   ferramentas/seletor_regiao
-tests/                           # 51 testes offline (não precisam do jogo)
+portal/                          # frontend: Vite + React + TS + Tailwind + shadcn
+  src/        pages/(Dashboard, Configuracoes, Perfis, Calibracao) · components/ui · hooks · lib
+tests/                           # testes offline (não precisam do jogo)
 ```
 
 ## Testes

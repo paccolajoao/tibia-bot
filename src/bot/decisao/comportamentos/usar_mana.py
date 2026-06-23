@@ -1,0 +1,50 @@
+"""UsarMana — descarga de mana para treino de ML.
+
+Enquanto mana >= mana_alto, pressiona a tecla configurada (cura forte por padrão)
+para gastar mana. Para quando mana < mana_alvo (histerese p/ não oscilar na borda).
+Prioridade baixa: roda só quando AutoCura, Alvo e Saque não têm nada a fazer.
+"""
+
+from __future__ import annotations
+
+from bot.configuracao import UsarManaConfig
+from bot.contexto import Contexto
+from bot.decisao.tipos import Decisao, TipoAcao
+
+CHAVE_COOLDOWN = "usar_mana"
+
+
+class UsarMana:
+    nome = "usar_mana"
+
+    def __init__(self, cfg: UsarManaConfig):
+        self.cfg = cfg
+        self.prioridade = cfg.prioridade
+        self._gastando = False
+
+    def avaliar(self, contexto: Contexto) -> Decisao | None:
+        mana = contexto.mana
+        if mana is None or mana.confianca < self.cfg.confianca_minima:
+            return None
+
+        pct = mana.percentual
+        if pct >= self.cfg.mana_alto:
+            self._gastando = True
+        elif pct < self.cfg.mana_alvo:
+            self._gastando = False
+
+        if not self._gastando:
+            return None
+
+        return Decisao(
+            self.nome,
+            TipoAcao.PRESSIONAR_TECLA,
+            tecla=self.cfg.tecla,
+            motivo=(
+                f"Mana {pct:.0f}% >= {self.cfg.mana_alto:.0f}%"
+                f" -> usar mana ({self.cfg.tecla.upper()})"
+            ),
+            prioridade=self.prioridade,
+            dados={"recurso": "mana_uso", "mana": pct},
+            chave_cooldown=CHAVE_COOLDOWN,
+        )

@@ -96,6 +96,9 @@ class AlvoConfig(BaseModel):
     # Re-ataca antes disso só se uma criatura morrer; o timeout é a rede p/ clique perdido.
     recompromisso_s: float = 3.0
     cooldown_s: dict[str, float] = Field(default_factory=lambda: {"atacar": 2.0})
+    # Se definida, usa TECLA (ex.: "space") em vez de clique na battle list.
+    # Requer que a tecla esteja bindada em Options > Hotkeys do Tibia como "Attack Closest".
+    tecla: str | None = None
 
 
 class ComerConfig(BaseModel):
@@ -116,6 +119,18 @@ class SaqueConfig(BaseModel):
     janela_s: float = 3.0  # após um kill, tenta saquear por esta janela
     intervalo_press_s: float = 1.0  # intervalo entre presses dentro da janela
     prioridade: int = 60  # abaixo de alvo (80), acima de comer (10)
+
+
+class UsarManaConfig(BaseModel):
+    """Descarga de mana para treino de ML: pressiona uma tecla enquanto mana >= mana_alto."""
+
+    ativo: bool = False
+    tecla: str = "f5"          # tecla a pressionar (normalmente cura forte)
+    mana_alto: float = 100.0   # acima disso, começa a gastar mana
+    mana_alvo: float = 80.0    # para de gastar abaixo disso (histerese)
+    confianca_minima: float = 0.6
+    cooldown_s: float = 1.0    # intervalo mínimo entre presses
+    prioridade: int = 15       # abaixo de tudo exceto Comer (10)
 
 
 class EntradaConfig(BaseModel):
@@ -143,9 +158,20 @@ class Config(BaseModel):
     alvo: AlvoConfig = Field(default_factory=AlvoConfig)
     comer: ComerConfig = Field(default_factory=ComerConfig)
     saque: SaqueConfig = Field(default_factory=SaqueConfig)
+    usar_mana: UsarManaConfig = Field(default_factory=UsarManaConfig)
     entrada: EntradaConfig = Field(default_factory=EntradaConfig)
     seguranca: SegurancaConfig = Field(default_factory=SegurancaConfig)
     painel: PainelConfig = Field(default_factory=PainelConfig)
+
+
+def config_para_dict(config: Config) -> dict:
+    """Serializa o Config para um dict JSON-safe (tipos primitivos)."""
+    return config.model_dump(mode="json")
+
+
+def config_de_dict(dados: dict) -> Config:
+    """Reconstrói (e valida) um Config a partir de um dict. Levanta em dados inválidos."""
+    return Config(**(dados or {}))
 
 
 def carregar_config(caminho: Path | None = None) -> Config:
