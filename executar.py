@@ -16,6 +16,7 @@ from bot.contexto import Contexto  # noqa: E402
 from bot.decisao.comportamentos.alvo import Alvo  # noqa: E402
 from bot.decisao.comportamentos.auto_cura import AutoCura  # noqa: E402
 from bot.decisao.comportamentos.comer import Comer  # noqa: E402
+from bot.decisao.comportamentos.drop import Drop  # noqa: E402
 from bot.decisao.comportamentos.saque import Saque  # noqa: E402
 from bot.decisao.comportamentos.usar_mana import UsarMana  # noqa: E402
 from bot.decisao.cooldown import GerenciadorCooldown  # noqa: E402
@@ -65,6 +66,12 @@ def _montar_loop(cfg, controlador, barramento, log) -> LoopBot:
     if cfg.comer.ativo:
         comportamentos.append(Comer(cfg.comer))
         log(f"Auto-comer habilitado -> tecla {cfg.comer.tecla.upper()} a cada {cfg.comer.intervalo_s:.0f}s")
+    if cfg.drop.ativo:
+        if cfg.regioes.drop_calibrado and cfg.drop.itens:
+            comportamentos.append(Drop(cfg.drop))
+            log(f"Drop de loot habilitado -> {len(cfg.drop.itens)} item(ns) cadastrado(s)")
+        else:
+            log("Drop de loot ligado mas sem itens ou sem inventário/tile calibrado — desativado", "alerta")
     motor = MotorDecisao(comportamentos, cooldown)
     seguranca = Seguranca(controlador, cfg.seguranca, log)
     seguranca.registrar_hotkeys()

@@ -5,7 +5,18 @@ Classifica preenchido vs vazio por HSV usando V (brilho) + S (saturação) — N
 matiz (Hue) — então sobrevive à mudança de cor do HP (verde -> vermelho) e serve
 à mana azul com o mesmo critério.
 
-Função pura `(np.ndarray, regiao, v_min, s_min) -> LeituraBarra` => testável offline.
+A classificação é feita por COLUNA usando toda a altura da barra (não uma única
+scanline): uma coluna conta como preenchida se uma fração mínima dos seus pixels
+estiver preenchida. Isso a torna robusta aos NÚMEROS sobrepostos na barra (ex.:
+"165/170"), cujo texto branco tem saturação baixa — a cor da barra acima/abaixo do
+dígito mantém a coluna preenchida.
+
+`invertido=True` trata barras que enchem da DIREITA->ESQUERDA (a mana do Tibia
+esvazia da esquerda p/ direita): basta espelhar o array de colunas antes de aplicar
+a mesma lógica "contíguo a partir da borda".
+
+Função pura `(np.ndarray, regiao, v_min, s_min, invertido) -> LeituraBarra`
+=> testável offline.
 """
 
 from __future__ import annotations
@@ -16,36 +27,42 @@ import numpy as np
 from bot.captura.base import Regiao
 from bot.visao.tipos import LeituraBarra
 
+# Fração mínima de pixels preenchidos numa coluna para considerá-la "cheia".
+# Baixa o suficiente para sobreviver a números/ícones sobre a barra, alta o
+# suficiente para ignorar 1-2 pixels espúrios de borda.
+FRACAO_COLUNA = 0.25
+
 
 def ler_percentual_barra(
     imagem: np.ndarray,
     regiao: Regiao,
     v_min: int = 60,
     s_min: int = 50,
-    n_amostras: int = 64,
+    invertido: bool = False,
 ) -> LeituraBarra:
     left, top, right, bottom = regiao
     roi = imagem[top:bottom, left:right]
     if roi.size == 0 or roi.shape[1] < 2:
         return LeituraBarra(0.0, 0.0)
 
-    altura, largura = roi.shape[:2]
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    s = hsv[:, :, 1].astype(int)
+    v = hsv[:, :, 2].astype(int)
+    mascara = (v >= v_min) & (s >= s_min)  # 2D: preenchido por pixel
 
-    # scanline horizontal no meio vertical da barra (robusto a bordas de 1px)
-    y = altura // 2
-    xs = np.unique(np.linspace(0, largura - 1, num=min(n_amostras, largura)).astype(int))
-    linha = hsv[y, xs]
-    s = linha[:, 1].astype(int)
-    v = linha[:, 2].astype(int)
-    preenchido = (v >= v_min) & (s >= s_min)
+    # Por coluna: cheia se uma fração mínima da altura estiver preenchida.
+    fracao = mascara.mean(axis=0)  # fração preenchida de cada coluna
+    preenchido = fracao >= FRACAO_COLUNA
+    if invertido:
+        preenchido = preenchido[::-1]  # barra ancorada à direita -> espelha
 
     total = int(preenchido.size)
     n_preench = int(preenchido.sum())
 
-    # Barras enchem da esquerda p/ direita; o percentual é a posição do primeiro
-    # pixel vazio após a região preenchida inicial. Usar o ÚLTIMO preenchido
-    # é sensível a pixels espúrios de borda (frame da UI) que inflariam p/ 100%.
+    # Após o espelhamento, o algoritmo sempre assume preenchimento a partir da
+    # esquerda. O percentual é a posição do primeiro pixel vazio após a região
+    # preenchida inicial. Usar o ÚLTIMO preenchido seria sensível a pixels
+    # espúrios de borda (frame da UI) que inflariam p/ 100%.
     if n_preench == 0:
         percentual = 0.0
     elif n_preench == total:

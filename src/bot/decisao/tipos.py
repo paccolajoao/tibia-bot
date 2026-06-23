@@ -10,6 +10,7 @@ from typing import Any
 class TipoAcao(Enum):
     PRESSIONAR_TECLA = auto()
     CLICAR = auto()
+    ARRASTAR = auto()  # drag-and-drop: de `ponto` para `ponto_destino` (drop de item)
     NENHUMA = auto()
 
 
@@ -21,7 +22,8 @@ class Decisao:
     motivo: str  # legível por humano -> vai direto pro log do painel
     prioridade: int = 0
     dados: dict[str, Any] = field(default_factory=dict)
-    ponto: tuple[int, int] | None = None  # coords absolutas do desktop p/ CLICAR
+    ponto: tuple[int, int] | None = None  # coords absolutas do desktop p/ CLICAR/ARRASTAR (origem)
+    ponto_destino: tuple[int, int] | None = None  # destino do ARRASTAR (coords absolutas)
     chave_cooldown: str | None = None  # chave de cooldown quando não há `tecla` (ex.: clique)
 
     @property

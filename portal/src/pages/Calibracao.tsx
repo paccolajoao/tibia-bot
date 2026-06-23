@@ -8,12 +8,22 @@ import { api } from "@/lib/api"
 import type { FrameCalibracao, Regiao } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-type Alvo = "hp" | "mana" | "battle_list"
+type Alvo = "hp" | "mana" | "battle_list" | "inventario" | "drop_tile"
 const ALVOS: { id: Alvo; rotulo: string; cor: string }[] = [
   { id: "hp", rotulo: "Barra de HP", cor: "var(--hp)" },
   { id: "mana", rotulo: "Barra de Mana", cor: "var(--mana)" },
   { id: "battle_list", rotulo: "Battle list (opcional)", cor: "var(--primary)" },
+  { id: "inventario", rotulo: "Inventário (drop)", cor: "var(--success)" },
+  { id: "drop_tile", rotulo: "Tile de drop", cor: "var(--warning)" },
 ]
+const ORDEM: Alvo[] = ["hp", "mana", "battle_list", "inventario", "drop_tile"]
+const REGIOES_ZERO: Record<Alvo, Regiao> = {
+  hp: [0, 0, 0, 0],
+  mana: [0, 0, 0, 0],
+  battle_list: [0, 0, 0, 0],
+  inventario: [0, 0, 0, 0],
+  drop_tile: [0, 0, 0, 0],
+}
 
 interface RetDisplay {
   x: number
@@ -27,17 +37,24 @@ export function Calibracao() {
   const [carregando, setCarregando] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [alvo, setAlvo] = useState<Alvo>("hp")
-  const [regioes, setRegioes] = useState<Record<Alvo, Regiao>>({
-    hp: [0, 0, 0, 0],
-    mana: [0, 0, 0, 0],
-    battle_list: [0, 0, 0, 0],
-  })
+  const [regioes, setRegioes] = useState<Record<Alvo, Regiao>>(REGIOES_ZERO)
   const [desenho, setDesenho] = useState<RetDisplay | null>(null)
   const inicio = useRef<{ x: number; y: number } | null>(null)
   const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
-    api.getConfig().then((c) => setRegioes({ hp: c.regioes.hp, mana: c.regioes.mana, battle_list: c.regioes.battle_list })).catch(() => {})
+    api
+      .getConfig()
+      .then((c) =>
+        setRegioes({
+          hp: c.regioes.hp,
+          mana: c.regioes.mana,
+          battle_list: c.regioes.battle_list,
+          inventario: c.regioes.inventario,
+          drop_tile: c.regioes.drop_tile,
+        })
+      )
+      .catch(() => {})
   }, [])
 
   async function capturar() {
@@ -94,8 +111,7 @@ export function Calibracao() {
     setRegioes((prev) => ({ ...prev, [alvo]: [l, t, r, b] as Regiao }))
     setDesenho(null)
     // avança automaticamente para o próximo alvo não-definido
-    const ordem: Alvo[] = ["hp", "mana", "battle_list"]
-    const prox = ordem.find((a) => a !== alvo && regioes[a].every((v) => v === 0))
+    const prox = ORDEM.find((a) => a !== alvo && regioes[a].every((v) => v === 0))
     if (prox) setAlvo(prox)
   }
 
@@ -114,8 +130,8 @@ export function Calibracao() {
   async function salvar() {
     setSalvando(true)
     try {
-      const payload: { hp?: Regiao; mana?: Regiao; battle_list?: Regiao } = {}
-      ;(["hp", "mana", "battle_list"] as Alvo[]).forEach((a) => {
+      const payload: Partial<Record<Alvo, Regiao>> = {}
+      ORDEM.forEach((a) => {
         if (!regioes[a].every((v) => v === 0)) payload[a] = regioes[a]
       })
       await api.putRegioes(payload)
@@ -127,7 +143,7 @@ export function Calibracao() {
     }
   }
 
-  const temHpMana = !regioes.hp.every((v) => v === 0) && !regioes.mana.every((v) => v === 0)
+  const temAlgo = ORDEM.some((a) => !regioes[a].every((v) => v === 0))
 
   return (
     <div className="space-y-6">
@@ -142,7 +158,7 @@ export function Calibracao() {
           <Button variant="outline" onClick={capturar} disabled={carregando}>
             {carregando ? <Loader2 className="animate-spin" /> : <Camera />} Capturar frame
           </Button>
-          <Button onClick={salvar} disabled={!temHpMana || salvando}>
+          <Button onClick={salvar} disabled={!temAlgo || salvando}>
             {salvando ? <Loader2 className="animate-spin" /> : <Save />} Salvar regiões
           </Button>
         </div>

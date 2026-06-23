@@ -35,8 +35,13 @@ export const api = {
   // config do perfil ativo
   getConfig: () => req<Config>("/api/config"),
   putConfig: (config: Config) => req<Config>("/api/config", { method: "PUT", body: JSON.stringify(config) }),
-  putRegioes: (regioes: { hp?: Regiao; mana?: Regiao; battle_list?: Regiao }) =>
-    req<unknown>("/api/regioes", { method: "PUT", body: JSON.stringify(regioes) }),
+  putRegioes: (regioes: {
+    hp?: Regiao
+    mana?: Regiao
+    battle_list?: Regiao
+    inventario?: Regiao
+    drop_tile?: Regiao
+  }) => req<unknown>("/api/regioes", { method: "PUT", body: JSON.stringify(regioes) }),
 
   // import/export
   exportUrl: (id?: number) => (id ? `/api/config/export?perfil_id=${id}` : "/api/config/export"),

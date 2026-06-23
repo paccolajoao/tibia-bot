@@ -10,8 +10,14 @@ estatísticas.
 - ✅ **Auto-comer** — aperta a hotkey de comida por tempo.
 - ✅ **Targeting** — detecta criaturas na *battle list* e **clica** para atacar (só quando não há alvo).
 - ✅ **Auto-loot** — dispara o **Quick Loot do Tibia** (hotkey) quando uma criatura morre.
+- ✅ **Drop de loot** — cadastre itens no portal (recortando o ícone) e o bot **arrasta** os
+  que encontrar na backpack para um tile do chão calibrado (reconhecimento por imagem).
 - ✅ **Dashboard web ao vivo** — HP/Mana, detecção (criaturas/alvo), decisão atual, log de
   raciocínio, preview anotado e estatísticas (curas, ataques, refeições, saques).
+
+> As barras de HP/Mana são lidas por amostragem de pixels (HSV), robusta aos **números
+> sobrepostos** na barra. A **mana** do Tibia esvazia da esquerda→direita: marque
+> **"Mana enche da direita"** na aba *Visão* do portal (ligado por padrão em perfis novos).
 
 Fundação pronta para extensão: captura, visão, decisão (comportamentos por prioridade),
 input (teclado **+ mouse**), telemetria e segurança. Próximas features (cavebot, bestiário)
@@ -97,8 +103,12 @@ targeting/auto-loot só ligam se a battle list foi calibrada.)
 
 **4) Calibrar pelo portal** (uma vez, ou quando mudar o layout do cliente). Na aba
 **Calibração**: clique **Capturar frame**, **arraste um retângulo** sobre a barra de HP,
-depois a de Mana e, opcional, a **battle list** (habilita targeting/auto-loot). Clique
-**Salvar regiões** e **reinicie** o `executar.py` para aplicar.
+depois a de Mana e, opcional, a **battle list** (habilita targeting/auto-loot) e, para o
+drop de loot, o **Inventário** (área da backpack varrida) e o **Tile de drop** (chão onde o
+item é solto). Clique **Salvar regiões** e **reinicie** o `executar.py` para aplicar.
+
+> **Drop de loot:** depois de calibrar inventário + tile, vá em **Configurações → Drop**,
+> ligue, e **cadastre os itens** clicando em *Adicionar item* e recortando o ícone na backpack.
 
 > Prefere linha de comando? O `calibrar.py` ainda existe e grava no mesmo perfil ativo
 > (`.\.venv\Scripts\python.exe calibrar.py`).
@@ -128,14 +138,17 @@ as seções abaixo:
 | `cura` | `cooldown_s` | intervalo mínimo por tecla (anti-spam) |
 | `alvo` | `tecla` n/a — usa **clique** | targeting clica na battle list; `confianca_minima`, `cooldown_s.atacar` |
 | `comer` | `tecla` / `intervalo_s` | hotkey de comida e de quantos em quantos segundos comer |
-| `saque` | `tecla` / `janela_s` | hotkey de Quick Loot e por quanto tempo tentar após um kill |
+| `saque` | `tecla` / `janela_s` / `prioridade` | hotkey de Quick Loot, por quanto tempo tentar após um kill, e prioridade (default 85, acima do alvo) |
+| `drop` | `ativo` / `itens` / `threshold` | drop de loot: itens (com template) a arrastar p/ o chão e a confiança do reconhecimento |
 | `visao` | `confianca_minima` | abaixo disso, ignora a leitura (não cura errado) |
+| `visao` | `hp.invertido` / `mana.invertido` | direção de preenchimento da barra (mana enche da direita) |
 | `captura` | `backend` | `auto` \| `bettercam` \| `wgc` \| `mss` \| `obs` \| `tibia_arquivo` |
 | `captura` | `fps_alvo` | ticks/seg do loop |
 | `seguranca` | `titulo_janela_contains` | título p/ detectar foco (`Tibia`) |
 
-`alvo` e `saque` só entram em ação quando a **battle list** está calibrada. `comer`/`saque`
-têm um campo `ativo` para ligar/desligar.
+`alvo` e `saque` só entram em ação quando a **battle list** está calibrada. `comer`/`saque`/`drop`
+têm um campo `ativo` para ligar/desligar. O **drop** exige `regioes.inventario` e
+`regioes.drop_tile` calibrados (na aba *Calibração*) e ao menos um item cadastrado.
 
 ## Como funciona
 
@@ -149,13 +162,15 @@ têm um campo `ativo` para ligar/desligar.
                                       └──────────── canal separado (Lock+Event)
 ```
 
-- **Visão:** lê o % de cada barra amostrando pixels e classificando preenchido vs vazio por
-  **HSV (brilho+saturação)** — funciona com HP mudando de cor e mana azul. Também detecta
-  **criaturas na battle list** (mini HP-bars) e se há **alvo atual**. Leitura "suja" (tooltip
-  cobrindo) gera **confiança baixa** e é ignorada.
-- **Decisão:** comportamentos por **prioridade** (cura 100 > alvo 80 > saque 60 > comer 10);
+- **Visão:** lê o % de cada barra classificando por **coluna** (toda a altura) em
+  **HSV (brilho+saturação)** — funciona com HP mudando de cor, mana azul, é robusta aos
+  **números sobre a barra** e respeita a **direção** (`invertido`, p/ a mana). Também detecta
+  **criaturas na battle list** (mini HP-bars), se há **alvo atual**, e **itens no inventário**
+  (template matching) p/ o drop. Leitura "suja" (tooltip cobrindo) gera **confiança baixa** e é ignorada.
+- **Decisão:** comportamentos por **prioridade** (cura 100 > saque 85 > alvo 80 > drop 50 > comer 10);
   o primeiro que quer agir vence o tick (uma ação por tick), com **cooldown** por hotkey.
-  Ações: **pressionar tecla** (cura/comer/saque) ou **clicar** (atacar na battle list).
+  Ações: **pressionar tecla** (cura/comer/saque), **clicar** (atacar na battle list) ou
+  **arrastar** (drop de item p/ o chão).
 - **Telemetria:** a fila é **best-effort** (descarta o mais antigo se cheia) — o loop do bot
   **nunca trava** por causa do painel.
 
@@ -164,8 +179,8 @@ têm um campo `ativo` para ligar/desligar.
 executar.py / calibrar.py        # entrypoints
 src/bot/
   captura/    base · dxgi · wgc · mss_fallback · obs_virtualcam · mapeamento · tibia_arquivo · instantaneo · fabrica
-  visao/      barra_recursos · lista_batalha · anotador · tipos
-  decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque, usar_mana)
+  visao/      barra_recursos · lista_batalha · inventario · anotador · tipos
+  decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque, drop, usar_mana)
   telemetria/ eventos · barramento · estatisticas
   entrada/    teclado_directinput · atrasos · simulada
   nucleo/     loop_bot · estado_execucao · seguranca

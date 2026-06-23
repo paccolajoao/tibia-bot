@@ -50,6 +50,8 @@ class RegioesConfig(BaseModel):
     hp: Regiao = (0, 0, 0, 0)
     mana: Regiao = (0, 0, 0, 0)
     battle_list: Regiao = (0, 0, 0, 0)
+    inventario: Regiao = (0, 0, 0, 0)  # área da backpack varrida no drop de loot
+    drop_tile: Regiao = (0, 0, 0, 0)   # tile do chão p/ onde o item é arrastado (usa o centro)
 
     @property
     def calibrado(self) -> bool:
@@ -61,16 +63,25 @@ class RegioesConfig(BaseModel):
         """True quando a região da battle list foi marcada (targeting habilitado)."""
         return any(self.battle_list)
 
+    @property
+    def drop_calibrado(self) -> bool:
+        """True quando inventário e tile de drop foram marcados (drop habilitado)."""
+        return any(self.inventario) and any(self.drop_tile)
+
 
 class ClassificadorConfig(BaseModel):
     v_min: int = 60  # brilho (HSV Value) mínimo para "preenchido"
     s_min: int = 50  # saturação mínima
+    # True quando a barra enche da DIREITA->ESQUERDA (esvazia da esq->dir).
+    # A mana do Tibia é assim; o HP é o normal (esq->dir).
+    invertido: bool = False
 
 
 class VisaoConfig(BaseModel):
     confianca_minima: float = 0.6
     hp: ClassificadorConfig = Field(default_factory=ClassificadorConfig)
-    mana: ClassificadorConfig = Field(default_factory=ClassificadorConfig)
+    # mana enche da direita->esquerda por padrão (comportamento do cliente Tibia)
+    mana: ClassificadorConfig = Field(default_factory=lambda: ClassificadorConfig(invertido=True))
 
 
 class CuraConfig(BaseModel):
@@ -94,7 +105,8 @@ class AlvoConfig(BaseModel):
     v_min: int = 60  # brilho mínimo
     # após atacar, NÃO troca de alvo por este tempo (deixa o auto-attack do Tibia matar).
     # Re-ataca antes disso só se uma criatura morrer; o timeout é a rede p/ clique perdido.
-    recompromisso_s: float = 3.0
+    # Curto (1.5s) para re-engajar rápido quando o clique não pega o alvo.
+    recompromisso_s: float = 1.5
     cooldown_s: dict[str, float] = Field(default_factory=lambda: {"atacar": 2.0})
     # Se definida, usa TECLA (ex.: "space") em vez de clique na battle list.
     # Requer que a tecla esteja bindada em Options > Hotkeys do Tibia como "Attack Closest".
@@ -116,9 +128,34 @@ class SaqueConfig(BaseModel):
     ativo: bool = True
     tecla: str = "f4"  # hotkey de Quick Loot bindada no Tibia
     confianca_minima: float = 0.6
-    janela_s: float = 3.0  # após um kill, tenta saquear por esta janela
+    janela_s: float = 5.0  # após um kill, tenta saquear por esta janela
     intervalo_press_s: float = 1.0  # intervalo entre presses dentro da janela
-    prioridade: int = 60  # abaixo de alvo (80), acima de comer (10)
+    # ACIMA de alvo (80): Quick Loot é 1 tecla rápida; saquear o corpo logo após a
+    # morte evita perder o loot quando ainda há outras criaturas para atacar.
+    prioridade: int = 85
+
+
+class ItemDrop(BaseModel):
+    """Um item a ser dropado, identificado por um template (ícone) recortado no portal."""
+
+    nome: str = ""
+    template_b64: str = ""  # PNG do ícone em base64 (sem prefixo data:)
+
+
+class DropConfig(BaseModel):
+    """Drop de loot: arrasta itens cadastrados da backpack para um tile do chão.
+
+    Requer `regioes.inventario` e `regioes.drop_tile` calibrados. A detecção é por
+    template matching (cv2.matchTemplate) sobre a região do inventário.
+    """
+
+    ativo: bool = False
+    itens: list[ItemDrop] = Field(default_factory=list)
+    threshold: float = 0.85  # confiança mínima do match (0..1)
+    intervalo_s: float = 1.0  # intervalo entre drops
+    prioridade: int = 50  # abaixo de cura/alvo/saque; acima de comer
+    # apertar Enter após arrastar (confirma a janela "Move how many?" de itens empilháveis)
+    confirmar_quantidade: bool = True
 
 
 class UsarManaConfig(BaseModel):
@@ -158,6 +195,7 @@ class Config(BaseModel):
     alvo: AlvoConfig = Field(default_factory=AlvoConfig)
     comer: ComerConfig = Field(default_factory=ComerConfig)
     saque: SaqueConfig = Field(default_factory=SaqueConfig)
+    drop: DropConfig = Field(default_factory=DropConfig)
     usar_mana: UsarManaConfig = Field(default_factory=UsarManaConfig)
     entrada: EntradaConfig = Field(default_factory=EntradaConfig)
     seguranca: SegurancaConfig = Field(default_factory=SegurancaConfig)

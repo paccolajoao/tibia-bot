@@ -57,6 +57,23 @@ def test_put_regioes(client):
     assert client.get("/api/config").json()["regioes"]["hp"] == [10, 20, 110, 40]
 
 
+def test_put_regioes_drop(client):
+    r = client.put("/api/regioes", json={"inventario": [1, 2, 3, 4], "drop_tile": [5, 6, 7, 8]})
+    assert r.status_code == 200
+    reg = client.get("/api/config").json()["regioes"]
+    assert reg["inventario"] == [1, 2, 3, 4] and reg["drop_tile"] == [5, 6, 7, 8]
+
+
+def test_config_drop_roundtrip(client):
+    cfg = client.get("/api/config").json()
+    cfg["drop"]["ativo"] = True
+    cfg["drop"]["itens"] = [{"nome": "rune", "template_b64": "QUJD"}]
+    assert client.put("/api/config", json=cfg).status_code == 200
+    salvo = client.get("/api/config").json()["drop"]
+    assert salvo["ativo"] is True
+    assert salvo["itens"][0]["nome"] == "rune"
+
+
 def test_export_importar_yaml(client):
     texto = client.get("/api/config/export").text
     assert "cura" in texto

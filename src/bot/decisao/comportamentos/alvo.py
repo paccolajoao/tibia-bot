@@ -39,7 +39,12 @@ class Alvo:
         if not usar_tecla and c.ponto_clique is None:
             return None
         if c.alvo_atual:
-            return None  # o client mostra alvo ativo (realce vermelho): não troca
+            # o client mostra alvo ativo (realce vermelho): não troca.
+            # Limpa o engajamento: o ataque pegou. Assim, quando o alvo sumir
+            # (morrer/fugir), o re-clique é IMEDIATO — sem esperar recompromisso_s
+            # de um engajamento velho que ficaria preso travando o próximo alvo.
+            contexto.estado_comportamentos.pop("alvo_engajado_ts", None)
+            return None
 
         # Após engajar, NÃO re-ataca até: (a) criatura morrer ou (b) recompromisso_s
         # expirar (rede de segurança para tecla/clique que não pegou o alvo).

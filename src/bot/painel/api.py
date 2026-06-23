@@ -50,6 +50,8 @@ class Regioes(BaseModel):
     hp: Regiao | None = None
     mana: Regiao | None = None
     battle_list: Regiao | None = None
+    inventario: Regiao | None = None
+    drop_tile: Regiao | None = None
 
 
 class ImportarYaml(BaseModel):
@@ -150,6 +152,10 @@ def criar_router_api(barramento=None) -> APIRouter:
             cfg.regioes.mana = body.mana
         if body.battle_list is not None:
             cfg.regioes.battle_list = body.battle_list
+        if body.inventario is not None:
+            cfg.regioes.inventario = body.inventario
+        if body.drop_tile is not None:
+            cfg.regioes.drop_tile = body.drop_tile
         repo.salvar_config_ativa(cfg)
         return cfg.regioes.model_dump(mode="json")
 

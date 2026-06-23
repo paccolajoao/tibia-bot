@@ -5,8 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampoNumero, CampoSelect, CampoSwitch, CampoTecla, CampoTexto } from "@/components/campos"
+import { DropItens } from "@/components/DropItens"
 import { api } from "@/lib/api"
-import type { Config, Meta } from "@/lib/types"
+import type { Config, ItemDrop, Meta } from "@/lib/types"
 import { getIn, setIn } from "@/lib/utils"
 
 function Secao({ titulo, descricao, children }: { titulo: string; descricao?: string; children: React.ReactNode }) {
@@ -104,6 +105,7 @@ export function Configuracoes() {
           <TabsTrigger value="cura">Cura</TabsTrigger>
           <TabsTrigger value="alvo">Alvo</TabsTrigger>
           <TabsTrigger value="acoes">Saque & Comer</TabsTrigger>
+          <TabsTrigger value="drop">Drop</TabsTrigger>
           <TabsTrigger value="mana">Usar Mana</TabsTrigger>
           <TabsTrigger value="captura">Captura</TabsTrigger>
           <TabsTrigger value="visao">Visão</TabsTrigger>
@@ -149,6 +151,17 @@ export function Configuracoes() {
           </Secao>
         </TabsContent>
 
+        <TabsContent value="drop" className="space-y-6">
+          <Secao titulo="Drop de loot" descricao="Arrasta itens cadastrados da backpack para o tile de drop (calibre em Calibração). Itens são reconhecidos por imagem (template).">
+            <CampoSwitch label="Ativo" valor={v("drop.ativo")} onChange={(x) => set("drop.ativo", x)} />
+            <CampoSwitch label="Confirmar quantidade (Enter)" dica="Aperta Enter após arrastar, p/ a janela 'Move how many?' de itens empilháveis." valor={v("drop.confirmar_quantidade")} onChange={(x) => set("drop.confirmar_quantidade", x)} />
+            <CampoNumero label="Confiança do match (threshold)" step={0.01} min={0} max={1} valor={v("drop.threshold")} onChange={(x) => set("drop.threshold", x)} dica="0..1 — quanto maior, mais exato o reconhecimento." />
+            <CampoNumero label="Intervalo entre drops" sufixo="s" step={0.5} valor={v("drop.intervalo_s")} onChange={(x) => set("drop.intervalo_s", x)} />
+            <CampoNumero label="Prioridade" valor={v("drop.prioridade")} onChange={(x) => set("drop.prioridade", x)} dica="Abaixo de cura/alvo/saque." />
+            <DropItens itens={(v("drop.itens") ?? []) as ItemDrop[]} onChange={(itens) => set("drop.itens", itens)} />
+          </Secao>
+        </TabsContent>
+
         <TabsContent value="mana" className="space-y-6">
           <Secao titulo="Usar Mana (treino)" descricao="Gasta mana apertando uma tecla enquanto a mana estiver alta (histerese).">
             <CampoSwitch label="Ativo" valor={v("usar_mana.ativo")} onChange={(x) => set("usar_mana.ativo", x)} />
@@ -180,8 +193,11 @@ export function Configuracoes() {
             <div className="hidden sm:block" />
             <CampoNumero label="HP — brilho mín. (v_min)" valor={v("visao.hp.v_min")} onChange={(x) => set("visao.hp.v_min", x)} />
             <CampoNumero label="HP — saturação mín. (s_min)" valor={v("visao.hp.s_min")} onChange={(x) => set("visao.hp.s_min", x)} />
+            <CampoSwitch label="HP enche da direita" dica="Deixe desligado: o HP normalmente enche da esquerda." valor={v("visao.hp.invertido")} onChange={(x) => set("visao.hp.invertido", x)} />
+            <div className="hidden sm:block" />
             <CampoNumero label="Mana — brilho mín. (v_min)" valor={v("visao.mana.v_min")} onChange={(x) => set("visao.mana.v_min", x)} />
             <CampoNumero label="Mana — saturação mín. (s_min)" valor={v("visao.mana.s_min")} onChange={(x) => set("visao.mana.s_min", x)} />
+            <CampoSwitch label="Mana enche da direita" dica="Ligado: a mana do Tibia esvazia da esquerda p/ direita." valor={v("visao.mana.invertido")} onChange={(x) => set("visao.mana.invertido", x)} />
           </Secao>
         </TabsContent>
 

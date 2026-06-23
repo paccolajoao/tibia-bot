@@ -23,11 +23,14 @@ export interface RegioesConfig {
   hp: Regiao
   mana: Regiao
   battle_list: Regiao
+  inventario: Regiao
+  drop_tile: Regiao
 }
 
 export interface Classificador {
   v_min: number
   s_min: number
+  invertido: boolean
 }
 
 export interface VisaoConfig {
@@ -72,6 +75,20 @@ export interface SaqueConfig {
   prioridade: number
 }
 
+export interface ItemDrop {
+  nome: string
+  template_b64: string
+}
+
+export interface DropConfig {
+  ativo: boolean
+  itens: ItemDrop[]
+  threshold: number
+  intervalo_s: number
+  prioridade: number
+  confirmar_quantidade: boolean
+}
+
 export interface UsarManaConfig {
   ativo: boolean
   tecla: string
@@ -107,6 +124,7 @@ export interface Config {
   alvo: AlvoConfig
   comer: ComerConfig
   saque: SaqueConfig
+  drop: DropConfig
   usar_mana: UsarManaConfig
   entrada: EntradaConfig
   seguranca: SegurancaConfig

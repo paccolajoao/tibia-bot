@@ -98,6 +98,19 @@ class LoopBot(threading.Thread):
         self._regiao_combinada = _combinar_regioes(self._reg_hp, self._reg_mana)
         self._battle_ativo = cfg.regioes.battle_list_calibrado
         self._reg_battle = tuple(cfg.regioes.battle_list) if self._battle_ativo else None
+        # drop de loot: varre o inventário e arrasta itens cadastrados p/ um tile do chão
+        self._drop_ativo = cfg.drop.ativo and cfg.regioes.drop_calibrado
+        self._reg_inventario = tuple(cfg.regioes.inventario) if self._drop_ativo else None
+        self._reg_drop_tile = tuple(cfg.regioes.drop_tile) if self._drop_ativo else None
+        self._drop_threshold = cfg.drop.threshold
+        self._templates: list[tuple[str, object]] = []
+        if self._drop_ativo:
+            from bot.visao.inventario import decodificar_template
+
+            for item in cfg.drop.itens:
+                tpl = decodificar_template(item.template_b64)
+                if tpl is not None:
+                    self._templates.append((item.nome, tpl))
         self._periodo = 1.0 / max(1.0, cfg.captura.fps_alvo)
         self._periodo_quadro = 1.0 / max(1.0, cfg.painel.fps_quadro)
         self._ultimo_motivo: str | None = None
@@ -200,15 +213,18 @@ class LoopBot(threading.Thread):
             cfg = self.ctx.config
             reg_hp_img = _absoluto_para_imagem(self._reg_hp, frame.regiao)
             reg_mana_img = _absoluto_para_imagem(self._reg_mana, frame.regiao)
-            self.ctx.hp = ler_percentual_barra(frame.imagem, reg_hp_img, cfg.visao.hp.v_min, cfg.visao.hp.s_min)
+            self.ctx.hp = ler_percentual_barra(
+                frame.imagem, reg_hp_img, cfg.visao.hp.v_min, cfg.visao.hp.s_min, cfg.visao.hp.invertido
+            )
             self.ctx.mana = ler_percentual_barra(
-                frame.imagem, reg_mana_img, cfg.visao.mana.v_min, cfg.visao.mana.s_min
+                frame.imagem, reg_mana_img, cfg.visao.mana.v_min, cfg.visao.mana.s_min, cfg.visao.mana.invertido
             )
 
             self._verificar_frames_pretos(t0)
 
             self.ctx.criaturas = self._detectar_battle_list(cfg)
             self._rastrear_mortes(self.ctx.criaturas, t0)
+            self._detectar_inventario()
 
             dec = self.motor.decidir(self.ctx, t0)
             executou = False
@@ -226,6 +242,12 @@ class LoopBot(threading.Thread):
                         f"[alvo] clique em screen={dec.ponto}  battle_list={self._reg_battle}",
                         "info",
                     ))
+            elif dec.acao == TipoAcao.ARRASTAR and dec.ponto and dec.ponto_destino:
+                self.entrada.arrastar(*dec.ponto, *dec.ponto_destino)
+                if dec.dados.get("confirmar"):
+                    # confirma a janela "Move how many?" de itens empilháveis
+                    self.entrada.pressionar_tecla("enter")
+                executou = True
             if executou:
                 self.motor.confirmar_acao(dec, t0)
                 self.ctx.estatisticas.registrar_acao(dec)
@@ -280,6 +302,39 @@ class LoopBot(threading.Thread):
                 px, py = self._transformar_clique(px, py)
             det.ponto_clique = (px, py)
         return det
+
+    def _detectar_inventario(self) -> None:
+        """Varre a região do inventário por itens cadastrados (template matching) e
+        preenche `ctx.itens_inventario` (pontos em coords absolutas) + `ctx.ponto_drop`.
+        """
+        self.ctx.itens_inventario = []
+        self.ctx.ponto_drop = None
+        if not self._drop_ativo or not self._templates or self._reg_inventario is None:
+            return
+        from bot.visao.inventario import detectar_itens
+
+        frame_inv = self.cap.capturar(self._reg_inventario)
+        if frame_inv is None:
+            return
+        reg_img = _absoluto_para_imagem(self._reg_inventario, frame_inv.regiao)
+        itens = detectar_itens(frame_inv.imagem, reg_img, self._templates, self._drop_threshold)
+        if not itens:
+            return
+
+        left, top, _, _ = self._reg_inventario
+        for it in itens:
+            ax, ay = left + it.ponto[0], top + it.ponto[1]
+            if self._transformar_clique is not None:
+                ax, ay = self._transformar_clique(ax, ay)
+            it.ponto = (ax, ay)
+        self.ctx.itens_inventario = itens
+
+        # destino do drop = centro do tile calibrado (transformado se for OBS)
+        dl, dt, dr, db = self._reg_drop_tile
+        dx, dy = (dl + dr) // 2, (dt + db) // 2
+        if self._transformar_clique is not None:
+            dx, dy = self._transformar_clique(dx, dy)
+        self.ctx.ponto_drop = (dx, dy)
 
     def _rastrear_mortes(self, det: DeteccaoCriaturas | None, ts: float) -> None:
         """Detecta morte (queda na contagem de criaturas) e carimba o ts no contexto.

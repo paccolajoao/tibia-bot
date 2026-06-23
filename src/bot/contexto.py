@@ -13,6 +13,7 @@ from typing import Any
 from bot.captura.base import Frame
 from bot.configuracao import Config
 from bot.telemetria.estatisticas import Estatisticas
+from bot.visao.inventario import ItemDetectado
 from bot.visao.tipos import DeteccaoCriaturas, LeituraBarra
 
 
@@ -23,6 +24,9 @@ class Contexto:
     hp: LeituraBarra | None = None
     mana: LeituraBarra | None = None
     criaturas: DeteccaoCriaturas | None = None
+    # itens do inventário detectados no tick (ponto JÁ em coords absolutas do desktop)
+    itens_inventario: list[ItemDetectado] = field(default_factory=list)
+    ponto_drop: tuple[int, int] | None = None  # destino do drop (coords absolutas)
     tick: int = 0
     ts: float = 0.0
     fps: float = 0.0
