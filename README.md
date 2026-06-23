@@ -6,10 +6,19 @@ ver *o que o bot está fazendo e pensando*: HP/Mana, log de raciocínio, preview
 estatísticas.
 
 **Funcionalidades atuais:**
-- ✅ **Auto-heal** — cura forte/leve e poção de mana por threshold de HP/Mana.
+- ✅ **Auto-heal** — cura forte/leve e poção de mana por threshold de HP/Mana. Cada hotkey pode
+  ser **magia OU poção** (o que você bindar no Tibia): ex. cura leve numa magia, cura forte numa pot.
 - ✅ **Auto-comer** — aperta a hotkey de comida por tempo.
-- ✅ **Targeting** — detecta criaturas na *battle list* e **clica** para atacar (só quando não há alvo).
+- ✅ **Targeting** — detecta criaturas na *battle list* e **clica** para atacar.
 - ✅ **Auto-loot** — dispara o **Quick Loot do Tibia** (hotkey) quando uma criatura morre.
+- ✅ **Magia de ataque** — em combate, aperta **uma** hotkey de ataque periodicamente (a *rotação*
+  de magias — exori → exori gran → … — você monta nessa hotkey no próprio Tibia), com **piso de
+  mana** para não esvaziar a mana da cura.
+- ✅ **Cavebot (navegação por waypoints)** — caminha a hunt **clicando no minimapa** (o Tibia
+  pathfinda cada trecho); a chegada é detectada quando o minimapa **para de rolar**. Rota em
+  **loop**. Trata **subida/descida** (escadas/buracos/cordas) com **validação da troca de andar**
+  e *watchdog* anti-travamento (se um bicho é inalcançável, volta a andar). Grave a rota clicando
+  no portal.
 - ✅ **Usar mana (treino de Magic Level)** — aperta uma tecla (ex.: cura forte) enquanto a mana
   está cheia, com histerese, para gastar mana e treinar ML.
 - ✅ **Drop de loot** — cadastre itens no portal (recortando o ícone **ou enviando um PNG/GIF**) e o
@@ -17,17 +26,19 @@ estatísticas.
   imagem, **multi-escala** e com máscara de transparência).
 - ✅ **Liga/desliga por feature** — aba **Recursos** no portal habilita/desabilita cada
   funcionalidade (útil p/ desligar o loot em conta premium, ou recursos ainda em teste).
+- ✅ **À prova de travamento** — cada tick roda dentro de uma rede de segurança: qualquer exceção
+  (visão/input/comportamento) é logada e o loop **segue** — uma falha pontual nunca derruba o bot.
 - ✅ **Dashboard web ao vivo** — HP/Mana, detecção (criaturas/alvo), decisão atual, log de
   raciocínio, preview anotado e estatísticas (abates, alvos, curas forte/leve, poções e usos de
-  mana, saques, refeições) com taxas por minuto.
+  mana, saques, refeições, passos do cavebot, magias de ataque) com taxas por minuto.
 
 > As barras de HP/Mana são lidas por amostragem de pixels (HSV), robusta aos **números
 > sobrepostos** na barra. A **mana** do Tibia esvazia da esquerda→direita: marque
 > **"Mana enche da direita"** na aba *Visão* do portal (ligado por padrão em perfis novos).
 
 Fundação pronta para extensão: captura, visão, decisão (comportamentos por prioridade),
-input (teclado **+ mouse**), telemetria e segurança. Próximas features (cavebot, bestiário)
-já têm o ponto de extensão — veja o [Roadmap](#roadmap).
+input (teclado **+ mouse**, incl. clique-direito), telemetria e segurança. Veja o
+[Roadmap](#roadmap) para o que vem a seguir (ex.: bestiário).
 
 > ⚠️ **Aviso.** Automatizar o cliente **oficial** do Tibia viola os Termos de Serviço da
 > CipSoft e há **BattlEye** (anti-cheat kernel-level). Esta abordagem é *pixel-only, processo
@@ -84,11 +95,13 @@ frontend com hot-reload: `npm run dev` (porta 5173, com proxy de `/api` e `/ws` 
 
 | Ação | Tecla padrão (config) | O que bindar no Tibia |
 |---|---|---|
-| Cura forte / leve | `f5` / `f6` | spell/runa de cura forte e leve |
+| Cura forte / leve | `f5` / `f6` | spell/runa/poção de cura forte e leve (pode ser magia OU pot) |
 | Poção de mana | `f1` | usar poção de mana |
 | Comida | `f7` | usar comida (auto-comer) |
 | Quick Loot | `f4` | **Quick Loot** (saque do corpo) — e configure suas *loot lists* |
+| Magia de ataque | `f7` | **uma** hotkey com a rotação de magias de ataque montada no Tibia |
 | Usar mana (treino) | `f5` | spell que gaste mana (a de cura forte serve) |
+| Cavebot — corda/pá (opcional) | a sua escolha | hotkey de corda/pá, p/ waypoints `tecla` que mudam de andar |
 
 > O **auto-loot usa o Quick Loot do Tibia**: a filtragem de itens (o que ignorar) é
 > configurada **nas loot lists do próprio cliente**, não no painel.
@@ -110,14 +123,22 @@ targeting/auto-loot só ligam se a battle list foi calibrada.)
 
 **4) Calibrar pelo portal** (uma vez, ou quando mudar o layout do cliente). Na aba
 **Calibração**: clique **Capturar frame**, **arraste um retângulo** sobre a barra de HP,
-depois a de Mana e, opcional, a **battle list** (habilita targeting/auto-loot) e, para o
-drop de loot, o **Inventário** (área da backpack varrida) e o **Tile de drop** (chão onde o
-item é solto). Clique **Salvar regiões** e **reinicie** o `executar.py` para aplicar.
+depois a de Mana e, opcional, a **battle list** (habilita targeting/auto-loot/magia de ataque),
+o **Inventário** + **Tile de drop** (drop de loot) e o **Minimapa** (cavebot). Clique **Salvar
+regiões** e **reinicie** o `executar.py` para aplicar.
 
 > **Drop de loot:** depois de calibrar inventário + tile, ligue na aba **Recursos** (ou em
 > **Configurações → Drop**) e **cadastre os itens** clicando em *Adicionar item* — recortando o
 > ícone de um frame capturado **ou enviando um PNG/GIF** do item. O reconhecimento é multi-escala,
 > então ícones de tamanho um pouco diferente ainda casam.
+
+> **Cavebot:** calibre o **Minimapa**, ligue em **Recursos** e, em **Configurações → Cavebot**,
+> **grave a rota** clicando em *Gravar waypoint*: tipo **Ir** (clique no minimapa) para andar, e
+> **Pisar/Usar/Tecla** para escada/buraco/corda (marque *muda de andar* para o bot validar a troca
+> de andar). Use ▲▼ para ordenar. A rota repete em loop.
+
+> **Magia de ataque:** com a battle list calibrada, ligue em **Recursos** e ajuste a hotkey +
+> piso de mana em **Configurações → Magia de ataque**.
 
 > Prefere linha de comando? O `calibrar.py` ainda existe e grava no mesmo perfil ativo
 > (`.\.venv\Scripts\python.exe calibrar.py`).
@@ -127,7 +148,9 @@ item é solto). Clique **Salvar regiões** e **reinicie** o `executar.py` para a
 
 ### Controles e segurança
 - **F11** — pausa/retoma. **F12** — pânico (para o input na hora).
-- **Auto-pause ao perder o foco** da janela do Tibia (volta sozinho quando você foca de novo).
+- **Foco gateia só o INPUT, não a leitura:** sem o Tibia em foco o bot continua **lendo** e
+  mostrando HP/Mana no painel, mas **não envia teclas/cliques** (o SendInput só chega na janela em
+  foco). Não há auto-pause — o Pausar/Retomar manual não é revertido.
 - Botões **Pausar/Retomar/Parar** também no painel.
 
 ## Configuração — pelo portal (perfis em SQLite)
@@ -153,6 +176,10 @@ todas as seções abaixo:
 | `saque` | `ativo` / `tecla` / `janela_s` / `prioridade` | hotkey de Quick Loot, por quanto tempo tentar após um kill, e prioridade (default 85, acima do alvo) |
 | `usar_mana` | `ativo` / `tecla` / `mana_alto` / `mana_alvo` | treino de ML: gasta mana com histerese. Mana cheia raramente lê 100% → use `mana_alto` ~95 |
 | `drop` | `ativo` / `itens` / `threshold` | drop de loot: itens (com template) a arrastar p/ o chão e a confiança do reconhecimento |
+| `magia_ataque` | `ativo` / `tecla` / `intervalo_s` / `mana_minima` | em combate, aperta 1 hotkey de ataque a cada `intervalo_s`; não ataca abaixo de `mana_minima`% |
+| `cavebot` | `ativo` / `waypoints` / `cooldown_s` | navegação por waypoints no minimapa (rota em loop). Exige `regioes.minimap` |
+| `cavebot` | `combate_timeout_s` | se há criatura mas nenhuma morte por este tempo (bicho inalcançável), volta a andar. `0` = nunca desiste |
+| `cavebot` | `limiar_troca_andar` / `tentativas_troca` | validação de escada/buraco/corda: pico do minimapa que confirma a troca + nº de re-tentativas |
 | `visao` | `confianca_minima` | abaixo disso, ignora a leitura (não cura errado) |
 | `visao` | `hp.invertido` / `mana.invertido` | direção de preenchimento da barra (mana enche da direita) |
 | `captura` | `backend` | `auto` \| `bettercam` \| `wgc` \| `mss` \| `obs` \| `tibia_arquivo` |
@@ -160,9 +187,10 @@ todas as seções abaixo:
 | `seguranca` | `titulo_janela_contains` | título p/ detectar foco (`Tibia`) |
 
 Toda feature tem um campo `ativo` (incl. `cura`/`alvo`); a aba **Recursos** é o jeito prático de
-ligar/desligar. `alvo` e `saque` só entram em ação quando a **battle list** está calibrada. O
-**drop** exige `regioes.inventario` e `regioes.drop_tile` calibrados (na aba *Calibração*) e ao
-menos um item cadastrado.
+ligar/desligar. `alvo`, `saque` e `magia_ataque` só entram em ação quando a **battle list** está
+calibrada. O **drop** exige `regioes.inventario` e `regioes.drop_tile` calibrados (na aba
+*Calibração*) e ao menos um item cadastrado. O **cavebot** exige `regioes.minimap` calibrado e ao
+menos um waypoint gravado.
 
 ## Como funciona
 
@@ -182,21 +210,26 @@ menos um item cadastrado.
   **criaturas na battle list** (mini HP-bars), se há **alvo atual**, e **itens no inventário**
   (template matching **multi-escala**, com máscara de transparência) p/ o drop. Leitura "suja"
   (tooltip cobrindo) gera **confiança baixa** e é ignorada.
-- **Decisão:** comportamentos por **prioridade** (cura 100 > saque 85 > alvo 80 > drop 50 >
-  usar_mana 15 > comer 10); o primeiro que quer agir vence o tick (uma ação por tick), com
-  **cooldown** por hotkey. Cada comportamento tem um `ativo` (liga/desliga na aba *Recursos*).
-  Ações: **pressionar tecla** (cura/comer/saque/usar_mana), **clicar** (atacar na battle list) ou
-  **arrastar** (drop de item p/ o chão).
+- **Decisão:** comportamentos por **prioridade** (cura 100 > saque 85 > alvo 80 > magia_ataque 70 >
+  drop 50 > cavebot 20 > usar_mana 15 > comer 10); o primeiro que quer agir vence o tick (uma ação
+  por tick), com **cooldown** por hotkey. Cada comportamento tem um `ativo` (liga/desliga na aba
+  *Recursos*). Ações: **pressionar tecla** (cura/comer/saque/usar_mana/magia_ataque), **clicar**
+  (atacar na battle list, andar no minimapa), **clicar-direito** (usar escada/alavanca no cavebot)
+  ou **arrastar** (drop de item p/ o chão). `cavebot` e `usar_mana` são tarefas de ocioso: **cedem
+  ao combate**.
 - **Telemetria:** a fila é **best-effort** (descarta o mais antigo se cheia) — o loop do bot
   **nunca trava** por causa do painel.
+- **À prova de falhas:** todo o trabalho do tick roda dentro de um `try/except` — uma exceção em
+  visão/input/comportamento é logada (com throttle) e o loop **segue** para o próximo tick, sem
+  derrubar a thread do bot.
 
 ### Estrutura
 ```
 executar.py / calibrar.py        # entrypoints
 src/bot/
   captura/    base · dxgi · wgc · mss_fallback · obs_virtualcam · mapeamento · tibia_arquivo · instantaneo · fabrica
-  visao/      barra_recursos · lista_batalha · inventario · anotador · tipos
-  decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque, drop, usar_mana)
+  visao/      barra_recursos · lista_batalha · inventario · minimap · anotador · tipos
+  decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque, drop, usar_mana, magia_ataque, cavebot)
   telemetria/ eventos · barramento · estatisticas
   entrada/    teclado_directinput · atrasos · simulada
   nucleo/     loop_bot · estado_execucao · seguranca
@@ -204,7 +237,7 @@ src/bot/
   painel/     servidor · api · ponte · web/(painel legado)
   ferramentas/seletor_regiao
 portal/                          # frontend: Vite + React + TS + Tailwind + shadcn
-  src/        pages/(Dashboard, Configuracoes, Perfis, Calibracao) · components/ui · hooks · lib
+  src/        pages/(Dashboard, Configuracoes, Perfis, Calibracao) · components/(ui, DropItens, Waypoints) · hooks · lib
 tests/                           # testes offline (não precisam do jogo)
 ```
 
@@ -214,35 +247,39 @@ tests/                           # testes offline (não precisam do jogo)
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Cobrem visão — barras, battle list e **inventário** (template matching multi-escala + máscara de
-alfa, contra imagens sintéticas) —, motor/cooldown, os comportamentos (cura, alvo, comer, saque,
-**usar mana**), barramento, a ponte assíncrona, o **painel web** (serve o HTML + streaming
-WebSocket via TestClient) e testes de integração do loop com captura/entrada falsas — tudo
-**sem o jogo aberto**.
+Cobrem visão — barras, battle list, **inventário** (template matching multi-escala + máscara de
+alfa) e **minimapa** (detecção de movimento) contra imagens sintéticas —, motor/cooldown, os
+comportamentos (cura, alvo, comer, saque, **usar mana**, **magia de ataque**, **cavebot** — incl.
+watchdog de combate e validação de troca de andar), barramento, a ponte assíncrona, o **painel
+web** (serve o HTML + streaming WebSocket via TestClient) e testes de integração do loop com
+captura/entrada falsas — **incluindo a rede de segurança** (uma exceção a cada tick não derruba o
+loop). Tudo **sem o jogo aberto**.
 
 ## Roadmap
 
 Cada feature nova = uma classe que implementa `ComportamentoBase` registrada no motor com uma
 prioridade (a cura fica em ~100, então sempre vence). Ex.: criar
-`src/bot/decisao/comportamentos/cavebot.py` com `nome`, `prioridade` e `avaliar(contexto)`,
-e adicioná-la à lista do `MotorDecisao` em `executar.py` — como já foi feito para
-`alvo`, `comer` e `saque`.
+`src/bot/decisao/comportamentos/minha_feature.py` com `nome`, `prioridade` e `avaliar(contexto)`,
+e adicioná-la à lista do `MotorDecisao` em `executar.py` — como já foi feito para todos os
+comportamentos abaixo.
 
-1. ✅ **Targeting** (`alvo.py`, ~80) — detecta criaturas na battle list e **clica** para
-   atacar (só quando não há alvo atual). Habilita marcando a battle list em `calibrar.py`.
-   A entrada já tem **mouse** (`clicar`) e o motor já entende a ação `CLICAR`.
+1. ✅ **Targeting** (`alvo.py`, ~80) — detecta criaturas na battle list e **clica** para atacar.
+   Habilita marcando a battle list na aba *Calibração*. A entrada tem **mouse** e o motor entende
+   a ação `CLICAR`.
 2. ✅ **Auto-comer** (`comer.py`, ~10) — aperta a hotkey de comida por tempo (`intervalo_s`).
-3. ✅ **Auto-loot** (`saque.py`, ~60) — dispara o **Quick Loot do Tibia** (hotkey) quando uma
+3. ✅ **Auto-loot** (`saque.py`, ~85) — dispara o **Quick Loot do Tibia** (hotkey) quando uma
    criatura morre (a contagem na battle list cai). A **filtragem de itens fica nas loot lists
    do próprio Tibia** — o painel mostra a contagem de saques, mas não gerencia o que ignorar.
-   Limitação: sem cavebot, só pega corpos adjacentes (melee).
-4. **Cavebot/waypoints** (`cavebot.py`, ~20) — pathfinding **A\*** (`tcod`) sobre grade lida
-   do minimap. Parte mais complexa do projeto.
-5. **Bestiário** — contagem de kills por criatura (depende de targeting).
+4. ✅ **Drop de loot** (`drop.py`, ~50) — arrasta itens cadastrados (template matching) p/ o chão.
+5. ✅ **Magia de ataque** (`magia_ataque.py`, ~70) — 1 hotkey de ataque em combate, com piso de mana.
+6. ✅ **Cavebot/waypoints** (`cavebot.py`, ~20) — navegação por **clique no minimapa** (o Tibia
+   pathfinda cada trecho; chegada por "minimapa parou de rolar"), rota em loop, validação de troca
+   de andar e watchdog anti-travamento. **Não** usa A\*/grade — é pixel-puro, mais simples e robusto.
+7. **Bestiário** — contagem de kills por criatura (depende de targeting).
 
 Cross-cutting: OCR (`pytesseract`) para números absolutos de HP/Mana no painel; auto-loot
 **bot-driven** (abrir corpo + template matching de sprites) para uma lista de ignorados
-gerida no portal.
+gerida no portal; posição absoluta no minimapa (SLAM) para cavebot auto-corretivo.
 
 ## Captura via OBS (Tibia oficial / WDA_EXCLUDEFROMCAPTURE)
 
@@ -293,7 +330,7 @@ o fallback lento `tibia_arquivo` (~3 FPS via hotkey de screenshot).
   (Iniciar Câmera Virtual). Deixe o OBS **aberto** enquanto usar o bot.
 
 **7. Apontar o bot para o OBS**
-- No `config/config.yaml`, seção `captura`: defina **`backend: obs`**.
+- No portal, em **Configurações → Captura**, defina **`backend: obs`** (e salve; reinicie o bot).
 - Opcional, mas recomendado: `pip install pygrabber` — assim o bot acha a câmera pelo nome
   (`obs_device_nome: OBS Virtual Camera`). Sem o pygrabber, ajuste `obs_device_index` (0, 1, 2…)
   até cair na câmera virtual (se tiver webcam física, o índice da virtual costuma ser o maior).
@@ -319,14 +356,15 @@ mas o 1:1 deixa o clique mais exato.
      todos pretos. Use **`backend: obs`** (seção acima) — é a saída recomendada.
   2. **Cliente em DX12/OpenGL + backend `mss`** (GDI não lê GPU). No 3.13 o backend **WGC**
      resolve — confirme no log de inicialização "backend WGC ... ativo". Se aparecer "mss",
-     instale a lib: `pip install windows-capture`, ou force `backend: wgc` no `config.yaml`.
+     instale a lib: `pip install windows-capture`, ou force `backend: wgc` no portal (Configurações → Captura).
   3. **Tela cheia EXCLUSIVA** derrota até WGC/DXGI (ignora o compositor do Windows). Em
      **Options → Graphics**, desligue **Full screen mode** e use **janela / sem bordas**.
 
   O `calibrar.py` salva o print em `dados/capturas/calibracao_screenshot.png` e avisa quando
   a captura vem preta — abra esse PNG para confirmar o que foi capturado.
 - **Tecla não chega no jogo** → rode o terminal como **Administrador**; confirme o `backend`
-  e as hotkeys do `config.yaml` iguais às do cliente.
+  e que as hotkeys do perfil (no portal) batem com as do cliente. Lembre que **sem foco** na
+  janela do Tibia o bot lê mas **não envia** input.
 - **Hotkeys F11/F12 não funcionam** → idem (admin).
 - **`bettercam` não instala** → normal no Python 3.13; o bot usa `mss` (veja o log na inicialização).
 - **% calibrado errado** → recalibre; em setup **multi-monitor**, mantenha o Tibia no monitor

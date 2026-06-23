@@ -165,6 +165,8 @@ export function Dashboard() {
               <Estatistica rotulo="poções mana" valor={t.stats?.pocoes_mana ?? 0} />
               <Estatistica rotulo="usos mana (treino)" valor={t.stats?.usos_mana ?? 0} />
               <Estatistica rotulo="refeições" valor={t.stats?.refeicoes ?? 0} />
+              <Estatistica rotulo="passos cavebot" valor={t.stats?.passos_cavebot ?? 0} />
+              <Estatistica rotulo="magias ataque" valor={t.stats?.magias_ataque ?? 0} />
               <Estatistica rotulo="uptime" valor={formatarTempo(t.stats?.uptime_s ?? 0)} />
               <Estatistica rotulo="fps" valor={(e?.fps ?? 0).toFixed(0)} />
               <Estatistica rotulo="tick" valor={e?.tick ?? 0} />

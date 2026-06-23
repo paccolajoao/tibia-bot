@@ -18,6 +18,8 @@ class Estatisticas:
     refeicoes: int = 0  # presses de comida
     saques: int = 0  # presses de Quick Loot
     abates: int = 0  # quedas detectadas na contagem da battle list (aproxima kills)
+    passos_cavebot: int = 0  # ações de navegação do cavebot executadas
+    magias_ataque: int = 0  # casts da hotkey de magia de ataque (inputs enviados)
     _fps_ema: float = 0.0
 
     def registrar_acao(self, decisao) -> None:
@@ -33,6 +35,10 @@ class Estatisticas:
             self.refeicoes += 1
         elif recurso == "saque":
             self.saques += 1
+        elif recurso == "cavebot":
+            self.passos_cavebot += 1
+        elif recurso == "magia_ataque":
+            self.magias_ataque += 1
         else:  # recurso == "hp" (cura de HP)
             self.curas += 1
             if decisao.dados.get("nivel") == "critico":

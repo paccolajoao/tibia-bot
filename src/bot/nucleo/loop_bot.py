@@ -111,6 +111,11 @@ class LoopBot(threading.Thread):
                 tpl = decodificar_template(item.template_b64)
                 if tpl is not None:
                     self._templates.append((item.nome, tpl))
+        # cavebot: observa o minimapa p/ detectar "andando" (chegada = parou de rolar)
+        self._minimap_ativo = cfg.cavebot.ativo and cfg.regioes.minimap_calibrado
+        self._reg_minimap = tuple(cfg.regioes.minimap) if self._minimap_ativo else None
+        self._limiar_movimento_minimap = cfg.cavebot.limiar_movimento
+        self._minimap_anterior = None
         self._periodo = 1.0 / max(1.0, cfg.captura.fps_alvo)
         self._periodo_quadro = 1.0 / max(1.0, cfg.painel.fps_quadro)
         self._ultimo_motivo: str | None = None
@@ -124,6 +129,9 @@ class LoopBot(threading.Thread):
         self._fallback_mss_feito = False
         # foco da janela do Tibia: gateia o INPUT (não a leitura). None = ainda não avaliado
         self._ultimo_foco: bool | None = None
+        # throttle do log de erro de tick (rede de segurança em run())
+        self._ultimo_erro_msg: str | None = None
+        self._ultimo_erro_ts: float = 0.0
         # backend OBS: regiões/clique ficam em coords de canvas -> mapear p/ desktop
         self._backend_nome = getattr(capturador, "nome_backend", cfg.captura.backend)
         self._transformar_clique = None
@@ -204,66 +212,15 @@ class LoopBot(threading.Thread):
                 )
                 self.bus.publicar(ev.LinhaRaciocinio(t0, self.ctx.tick, msg, "info"))
 
-            frame = self.cap.capturar(self._regiao_combinada)
-            if frame is None:
-                time.sleep(self._periodo)
-                continue
-            self.ctx.frame_atual = frame
-
-            cfg = self.ctx.config
-            reg_hp_img = _absoluto_para_imagem(self._reg_hp, frame.regiao)
-            reg_mana_img = _absoluto_para_imagem(self._reg_mana, frame.regiao)
-            self.ctx.hp = ler_percentual_barra(
-                frame.imagem, reg_hp_img, cfg.visao.hp.v_min, cfg.visao.hp.s_min, cfg.visao.hp.invertido
-            )
-            self.ctx.mana = ler_percentual_barra(
-                frame.imagem, reg_mana_img, cfg.visao.mana.v_min, cfg.visao.mana.s_min, cfg.visao.mana.invertido
-            )
-
-            self._verificar_frames_pretos(t0)
-
-            self.ctx.criaturas = self._detectar_battle_list(cfg)
-            self._rastrear_mortes(self.ctx.criaturas, t0)
-            self._detectar_inventario()
-
-            dec = self.motor.decidir(self.ctx, t0)
-            executou = False
-            if not self.ctx.janela_focada:
-                pass  # sem foco: decide e exibe, mas não envia input (SendInput exige foco)
-            elif dec.acao == TipoAcao.PRESSIONAR_TECLA and dec.tecla:
-                self.entrada.pressionar_tecla(dec.tecla)
-                executou = True
-            elif dec.acao == TipoAcao.CLICAR and dec.ponto:
-                self.entrada.clicar(*dec.ponto)
-                executou = True
-                if dec.dados.get("recurso") == "alvo":
-                    self.bus.publicar(ev.LinhaRaciocinio(
-                        t0, self.ctx.tick,
-                        f"[alvo] clique em screen={dec.ponto}  battle_list={self._reg_battle}",
-                        "info",
-                    ))
-            elif dec.acao == TipoAcao.ARRASTAR and dec.ponto and dec.ponto_destino:
-                self.entrada.arrastar(*dec.ponto, *dec.ponto_destino)
-                if dec.dados.get("confirmar"):
-                    # confirma a janela "Move how many?" de itens empilháveis
-                    self.entrada.pressionar_tecla("enter")
-                executou = True
-            if executou:
-                self.motor.confirmar_acao(dec, t0)
-                self.ctx.estatisticas.registrar_acao(dec)
-                if dec.dados.get("recurso") == "alvo":
-                    # marca o engajamento: o Alvo não troca de bicho até morte/timeout
-                    self.ctx.estado_comportamentos["alvo_engajado_ts"] = t0
-
-            self._publicar_decisao(dec)
-            self._publicar_deteccao()
-            self._talvez_publicar_quadro(reg_hp_img, reg_mana_img, dec)
-
-            dt = time.perf_counter() - t0
-            self.ctx.estatisticas.atualizar_fps(1.0 / dt if dt > 0 else 0.0)
-            self.ctx.fps = self.ctx.estatisticas.fps_medio
-            self._publicar_estado()
-            self._talvez_publicar_stats(t0)
+            # Rede de segurança: QUALQUER exceção no tick (detecção, input, comportamento)
+            # é logada e engolida — nunca derruba a thread do bot (senão o painel ficaria
+            # de pé mas o bot congelado). Pior caso: perde-se 1 tick. O incremento de tick,
+            # o limite de max_ticks e o sleep de cadência ficam FORA do try, então rodam
+            # sempre (inclusive sob erro recorrente, p/ o loop ainda respeitar max_ticks).
+            try:
+                self._processar_tick(t0)
+            except Exception as e:  # noqa: BLE001 — rede de segurança proposital
+                self._logar_erro_tick(t0, e)
 
             self.ctx.tick += 1
             if self._max_ticks is not None and self.ctx.tick >= self._max_ticks:
@@ -279,6 +236,91 @@ class LoopBot(threading.Thread):
             self.cap.parar()
         except Exception:
             pass
+
+    # ------------------------------------------------------------ tick
+    def _processar_tick(self, t0: float) -> None:
+        """O trabalho de um tick: captura -> visão -> decisão -> input -> telemetria.
+
+        Pode levantar exceção; `run()` a captura para não derrubar a thread.
+        """
+        frame = self.cap.capturar(self._regiao_combinada)
+        if frame is None:
+            return  # frame preto/vazio: nada a fazer neste tick (o sleep de cadência roda em run)
+        self.ctx.frame_atual = frame
+
+        cfg = self.ctx.config
+        reg_hp_img = _absoluto_para_imagem(self._reg_hp, frame.regiao)
+        reg_mana_img = _absoluto_para_imagem(self._reg_mana, frame.regiao)
+        self.ctx.hp = ler_percentual_barra(
+            frame.imagem, reg_hp_img, cfg.visao.hp.v_min, cfg.visao.hp.s_min, cfg.visao.hp.invertido
+        )
+        self.ctx.mana = ler_percentual_barra(
+            frame.imagem, reg_mana_img, cfg.visao.mana.v_min, cfg.visao.mana.s_min, cfg.visao.mana.invertido
+        )
+
+        self._verificar_frames_pretos(t0)
+
+        self.ctx.criaturas = self._detectar_battle_list(cfg)
+        self._rastrear_mortes(self.ctx.criaturas, t0)
+        self._detectar_inventario()
+        self._detectar_minimap()
+
+        dec = self.motor.decidir(self.ctx, t0)
+        executou = False
+        if not self.ctx.janela_focada:
+            pass  # sem foco: decide e exibe, mas não envia input (SendInput exige foco)
+        elif dec.acao == TipoAcao.PRESSIONAR_TECLA and dec.tecla:
+            self.entrada.pressionar_tecla(dec.tecla)
+            executou = True
+        elif dec.acao == TipoAcao.CLICAR and dec.ponto:
+            self.entrada.clicar(*self._ponto_para_clique(dec))
+            executou = True
+            if dec.dados.get("recurso") == "alvo":
+                self.bus.publicar(ev.LinhaRaciocinio(
+                    t0, self.ctx.tick,
+                    f"[alvo] clique em screen={dec.ponto}  battle_list={self._reg_battle}",
+                    "info",
+                ))
+        elif dec.acao == TipoAcao.CLICAR_DIREITO and dec.ponto:
+            self.entrada.clicar_direito(*self._ponto_para_clique(dec))
+            executou = True
+        elif dec.acao == TipoAcao.ARRASTAR and dec.ponto and dec.ponto_destino:
+            self.entrada.arrastar(*dec.ponto, *dec.ponto_destino)
+            if dec.dados.get("confirmar"):
+                # confirma a janela "Move how many?" de itens empilháveis
+                self.entrada.pressionar_tecla("enter")
+            executou = True
+        if executou:
+            self.motor.confirmar_acao(dec, t0)
+            self.ctx.estatisticas.registrar_acao(dec)
+            recurso = dec.dados.get("recurso")
+            if recurso == "alvo":
+                # marca o engajamento: o Alvo não troca de bicho até morte/timeout
+                self.ctx.estado_comportamentos["alvo_engajado_ts"] = t0
+            elif recurso == "cavebot":
+                # confirma que a ação de navegação saiu: o Cavebot só entra em
+                # "aguardando chegada" após esse carimbo (evita esperar um trecho
+                # que nunca andou por causa de clique não-executado).
+                self.ctx.estado_comportamentos["cavebot_acao_ts"] = t0
+
+        self._publicar_decisao(dec)
+        self._publicar_deteccao()
+        self._talvez_publicar_quadro(reg_hp_img, reg_mana_img, dec)
+
+        dt = time.perf_counter() - t0
+        self.ctx.estatisticas.atualizar_fps(1.0 / dt if dt > 0 else 0.0)
+        self.ctx.fps = self.ctx.estatisticas.fps_medio
+        self._publicar_estado()
+        self._talvez_publicar_stats(t0)
+
+    def _logar_erro_tick(self, t0: float, e: Exception) -> None:
+        """Loga um erro de tick (throttle p/ não inundar o painel se repetir)."""
+        msg = f"Erro no tick: {type(e).__name__}: {e}"
+        if msg == self._ultimo_erro_msg and (t0 - self._ultimo_erro_ts) < 2.0:
+            return  # mesmo erro há <2s: não repete
+        self._ultimo_erro_msg = msg
+        self._ultimo_erro_ts = t0
+        self.bus.publicar(ev.LinhaRaciocinio(t0, self.ctx.tick, msg, "alerta"))
 
     # -------------------------------------------------------- battle list
     def _detectar_battle_list(self, cfg) -> DeteccaoCriaturas | None:
@@ -335,6 +377,35 @@ class LoopBot(threading.Thread):
         if self._transformar_clique is not None:
             dx, dy = self._transformar_clique(dx, dy)
         self.ctx.ponto_drop = (dx, dy)
+
+    def _ponto_para_clique(self, dec: Decisao) -> tuple[int, int]:
+        """Coords finais do clique. Decisões com `dados['transformar']` (cavebot)
+        carregam coords de FRAME/canvas e precisam do mapeamento OBS->desktop em
+        runtime; as demais (alvo/drop) já vêm pré-transformadas pelo detector.
+        """
+        ponto = dec.ponto
+        if dec.dados.get("transformar") and self._transformar_clique is not None:
+            ponto = self._transformar_clique(*ponto)
+        return ponto
+
+    def _detectar_minimap(self) -> None:
+        """Captura o minimapa (se calibrado) e estima se o player está ANDANDO,
+        comparando com o crop anterior. O cavebot lê isso p/ detectar chegada.
+        """
+        if not self._minimap_ativo or self._reg_minimap is None:
+            return
+        from bot.visao.minimap import minimapa_movendo
+
+        frame_mm = self.cap.capturar(self._reg_minimap)
+        if frame_mm is None:
+            return
+        reg_img = _absoluto_para_imagem(self._reg_minimap, frame_mm.regiao)
+        esq, topo, dir_, base = reg_img
+        crop = frame_mm.imagem[topo:base, esq:dir_]
+        movendo, score = minimapa_movendo(crop, self._minimap_anterior, self._limiar_movimento_minimap)
+        self._minimap_anterior = crop.copy()
+        self.ctx.estado_comportamentos["minimap_movendo"] = movendo
+        self.ctx.estado_comportamentos["minimap_score"] = score
 
     def _rastrear_mortes(self, det: DeteccaoCriaturas | None, ts: float) -> None:
         """Detecta morte (queda na contagem de criaturas) e carimba o ts no contexto.
@@ -500,5 +571,7 @@ class LoopBot(threading.Thread):
                 curas_leve=e.curas_leve,
                 usos_mana=e.usos_mana,
                 abates=e.abates,
+                passos_cavebot=e.passos_cavebot,
+                magias_ataque=e.magias_ataque,
             )
         )

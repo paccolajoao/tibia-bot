@@ -68,6 +68,26 @@ class CapKill:
         pass
 
 
+class CapErro:
+    """Captura que SEMPRE levanta — prova que a rede de segurança do tick não derruba
+    a thread (o loop loga o erro e segue até max_ticks)."""
+
+    nome_backend = "fake"
+
+    def __init__(self):
+        self.chamadas = 0
+
+    def iniciar(self):
+        pass
+
+    def capturar(self, regiao=None):
+        self.chamadas += 1
+        raise RuntimeError("falha sintética de captura")
+
+    def parar(self):
+        pass
+
+
 class SegFake:
     def janela_focada(self):
         return True
@@ -212,3 +232,26 @@ def test_loop_auto_comer_por_tempo(fazer_barra):
     # come no 1º tick (intervalo grande impede repetir nos ticks seguintes do teste)
     assert entrada.teclas.count(cfg.comer.tecla) == 1
     assert ctx.estatisticas.refeicoes == 1
+
+
+def test_loop_sobrevive_a_excecao_no_tick():
+    # Rede de segurança: uma exceção a cada tick NÃO derruba a thread nem trava o loop;
+    # ele loga e segue, respeitando max_ticks (sem isso, run() levantaria e o bot congelaria).
+    cfg = Config()
+    cfg.regioes.hp = (5, 2, 125, 16)
+    cfg.regioes.mana = (5, 22, 125, 36)
+    cfg.captura.fps_alvo = 1000
+
+    ctx = Contexto(config=cfg)
+    bus = BarramentoEventos(maxsize=10000)
+    ctrl = ControladorExecucao()
+    motor = MotorDecisao(
+        [AutoCura(cfg.cura, cfg.visao.confianca_minima)], GerenciadorCooldown(cfg.cura.cooldown_s)
+    )
+    cap = CapErro()
+    loop = LoopBot(ctx, cap, EntradaSimulada(), motor, ctrl, SegFake(), bus, max_ticks=3)
+
+    loop.run()  # não deve levantar nem travar
+
+    assert ctx.tick == 3       # rodou os 3 ticks apesar do erro em cada um
+    assert cap.chamadas >= 3   # tentou capturar todo tick

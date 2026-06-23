@@ -47,5 +47,8 @@ class MotorDecisao:
         return bloqueado or Decisao.nenhuma()
 
     def confirmar_acao(self, decisao: Decisao, agora: float) -> None:
-        if decisao.acao in (TipoAcao.PRESSIONAR_TECLA, TipoAcao.CLICAR) and decisao.chave_cd:
+        if (
+            decisao.acao in (TipoAcao.PRESSIONAR_TECLA, TipoAcao.CLICAR, TipoAcao.CLICAR_DIREITO)
+            and decisao.chave_cd
+        ):
             self._cooldown.registrar(decisao.chave_cd, agora)

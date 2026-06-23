@@ -52,6 +52,7 @@ class RegioesConfig(BaseModel):
     battle_list: Regiao = (0, 0, 0, 0)
     inventario: Regiao = (0, 0, 0, 0)  # área da backpack varrida no drop de loot
     drop_tile: Regiao = (0, 0, 0, 0)   # tile do chão p/ onde o item é arrastado (usa o centro)
+    minimap: Regiao = (0, 0, 0, 0)     # área do minimapa observada pelo cavebot (detecção de "andando")
 
     @property
     def calibrado(self) -> bool:
@@ -67,6 +68,11 @@ class RegioesConfig(BaseModel):
     def drop_calibrado(self) -> bool:
         """True quando inventário e tile de drop foram marcados (drop habilitado)."""
         return any(self.inventario) and any(self.drop_tile)
+
+    @property
+    def minimap_calibrado(self) -> bool:
+        """True quando a região do minimapa foi marcada (cavebot habilitado)."""
+        return any(self.minimap)
 
 
 class ClassificadorConfig(BaseModel):
@@ -175,6 +181,59 @@ class UsarManaConfig(BaseModel):
     prioridade: int = 15       # abaixo de tudo exceto Comer (10)
 
 
+class Waypoint(BaseModel):
+    """Um ponto da rota do cavebot.
+
+    `x`/`y` são coords de FRAME (mesmo espaço das regiões calibradas; sob OBS são
+    coords de canvas, convertidas p/ desktop em runtime). Para `ir` o ponto é no
+    minimapa; para `andar_em`/`usar` é no game-world.
+    """
+
+    tipo: str = "ir"          # ir | andar_em | usar | tecla | esperar
+    nome: str = ""
+    x: int = 0
+    y: int = 0
+    tecla: str | None = None  # p/ tipo "tecla" (hotkey de corda/pá bindada no Tibia)
+    dwell_s: float = 1.5      # espera após executar (troca de andar / assentar)
+    # marca waypoints que MUDAM DE ANDAR (escada/buraco/corda/pá): o cavebot valida a
+    # troca pelo pico do minimapa e re-tenta se falhar (ver CavebotConfig.limiar_troca_andar)
+    troca_andar: bool = False
+
+
+class CavebotConfig(BaseModel):
+    """Navegação por waypoints: clica pontos no minimapa em sequência (o Tibia
+    pathfinda cada trecho). Cede ao combate. Requer `regioes.minimap` calibrado.
+    """
+
+    ativo: bool = False
+    prioridade: int = 20  # acima dos ociosos (usar_mana=15/comer=10); cede ao combate ele mesmo
+    waypoints: list[Waypoint] = Field(default_factory=list)
+    cooldown_s: float = 0.8          # intervalo mínimo entre cliques de navegação
+    parado_ticks: int = 4            # ticks de minimapa estático p/ considerar "chegou"
+    limiar_movimento: float = 2.0    # diff médio por pixel acima disso = "minimapa movendo"
+    timeout_trecho_s: float = 8.0    # desiste do trecho (re-clica/avança) após este tempo
+    # watchdog de combate: se há criaturas mas nenhuma morte por este tempo (bicho
+    # inalcançável), o cavebot volta a andar em vez de ceder p/ sempre. 0 = nunca desiste.
+    combate_timeout_s: float = 15.0
+    # validação de troca de andar: pico de diff do minimapa que confirma que mudou o andar
+    limiar_troca_andar: float = 25.0
+    tentativas_troca: int = 3        # re-tentativas de um waypoint troca_andar antes de seguir
+
+
+class MagiaAtaqueConfig(BaseModel):
+    """Aperta UMA hotkey de ataque enquanto há criatura em combate (a rotação de
+    magias é montada no próprio Tibia nessa hotkey). Respeita um piso de mana p/ não
+    esvaziar a mana necessária para cura. Cede a cura/saque/alvo (prioridade menor).
+    """
+
+    ativo: bool = False
+    tecla: str = "f7"
+    intervalo_s: float = 2.0       # cooldown entre casts (vira o cooldown da chave)
+    mana_minima: float = 30.0      # não ataca abaixo disso (preserva mana p/ cura)
+    confianca_minima: float = 0.6
+    prioridade: int = 70           # abaixo de cura(100)/saque(85)/alvo(80); acima de drop(50)
+
+
 class EntradaConfig(BaseModel):
     atraso_pre_ms: tuple[int, int] = (40, 90)
     atraso_pos_ms: tuple[int, int] = (30, 70)
@@ -202,6 +261,8 @@ class Config(BaseModel):
     saque: SaqueConfig = Field(default_factory=SaqueConfig)
     drop: DropConfig = Field(default_factory=DropConfig)
     usar_mana: UsarManaConfig = Field(default_factory=UsarManaConfig)
+    cavebot: CavebotConfig = Field(default_factory=CavebotConfig)
+    magia_ataque: MagiaAtaqueConfig = Field(default_factory=MagiaAtaqueConfig)
     entrada: EntradaConfig = Field(default_factory=EntradaConfig)
     seguranca: SegurancaConfig = Field(default_factory=SegurancaConfig)
     painel: PainelConfig = Field(default_factory=PainelConfig)

@@ -25,6 +25,7 @@ export interface RegioesConfig {
   battle_list: Regiao
   inventario: Regiao
   drop_tile: Regiao
+  minimap: Regiao
 }
 
 export interface Classificador {
@@ -101,6 +102,40 @@ export interface UsarManaConfig {
   prioridade: number
 }
 
+export type WaypointTipo = "ir" | "andar_em" | "usar" | "tecla" | "esperar"
+
+export interface Waypoint {
+  tipo: WaypointTipo
+  nome: string
+  x: number
+  y: number
+  tecla: string | null
+  dwell_s: number
+  troca_andar: boolean
+}
+
+export interface CavebotConfig {
+  ativo: boolean
+  prioridade: number
+  waypoints: Waypoint[]
+  cooldown_s: number
+  parado_ticks: number
+  limiar_movimento: number
+  timeout_trecho_s: number
+  combate_timeout_s: number
+  limiar_troca_andar: number
+  tentativas_troca: number
+}
+
+export interface MagiaAtaqueConfig {
+  ativo: boolean
+  tecla: string
+  intervalo_s: number
+  mana_minima: number
+  confianca_minima: number
+  prioridade: number
+}
+
 export interface EntradaConfig {
   atraso_pre_ms: [number, number]
   atraso_pos_ms: [number, number]
@@ -128,6 +163,8 @@ export interface Config {
   saque: SaqueConfig
   drop: DropConfig
   usar_mana: UsarManaConfig
+  cavebot: CavebotConfig
+  magia_ataque: MagiaAtaqueConfig
   entrada: EntradaConfig
   seguranca: SegurancaConfig
   painel: PainelConfig
@@ -192,6 +229,8 @@ export interface TelemetriaStats {
   refeicoes?: number
   saques?: number
   abates?: number
+  passos_cavebot?: number
+  magias_ataque?: number
   uptime_s: number
 }
 

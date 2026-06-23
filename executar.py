@@ -15,8 +15,16 @@ from bot.captura.fabrica import criar_capturador  # noqa: E402
 from bot.contexto import Contexto  # noqa: E402
 from bot.decisao.comportamentos.alvo import Alvo  # noqa: E402
 from bot.decisao.comportamentos.auto_cura import AutoCura  # noqa: E402
+from bot.decisao.comportamentos.cavebot import (
+    CHAVE_COOLDOWN as CHAVE_COOLDOWN_CAVEBOT,  # noqa: E402
+)
+from bot.decisao.comportamentos.cavebot import Cavebot  # noqa: E402
 from bot.decisao.comportamentos.comer import Comer  # noqa: E402
 from bot.decisao.comportamentos.drop import Drop  # noqa: E402
+from bot.decisao.comportamentos.magia_ataque import (
+    CHAVE_COOLDOWN as CHAVE_COOLDOWN_MAGIA,  # noqa: E402
+)
+from bot.decisao.comportamentos.magia_ataque import MagiaAtaque  # noqa: E402
 from bot.decisao.comportamentos.saque import Saque  # noqa: E402
 from bot.decisao.comportamentos.usar_mana import (
     CHAVE_COOLDOWN as CHAVE_COOLDOWN_USAR_MANA,  # noqa: E402
@@ -52,7 +60,11 @@ def _montar_loop(cfg, controlador, barramento, log) -> LoopBot:
     # cooldown do usar-mana é chaveado pela CHAVE_COOLDOWN da Decisao ("usar_mana"),
     # não pela tecla — senão o motor consulta uma chave que não existe no gerenciador.
     usar_mana_cd = {CHAVE_COOLDOWN_USAR_MANA: cfg.usar_mana.cooldown_s} if cfg.usar_mana.ativo else {}
-    cooldown = GerenciadorCooldown({**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s, **usar_mana_cd})
+    cavebot_cd = {CHAVE_COOLDOWN_CAVEBOT: cfg.cavebot.cooldown_s} if cfg.cavebot.ativo else {}
+    magia_cd = {CHAVE_COOLDOWN_MAGIA: cfg.magia_ataque.intervalo_s} if cfg.magia_ataque.ativo else {}
+    cooldown = GerenciadorCooldown(
+        {**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s, **usar_mana_cd, **cavebot_cd, **magia_cd}
+    )
     comportamentos = []
     if cfg.cura.ativo:
         comportamentos.append(AutoCura(cfg.cura, cfg.visao.confianca_minima))
@@ -69,6 +81,15 @@ def _montar_loop(cfg, controlador, barramento, log) -> LoopBot:
             log("Targeting desligado (recurso desativado na config)")
     else:
         log("Targeting/auto-loot desligados — battle list não calibrada (rode calibrar.py)")
+    if cfg.magia_ataque.ativo:
+        if cfg.regioes.battle_list_calibrado:
+            comportamentos.append(MagiaAtaque(cfg.magia_ataque))
+            log(
+                f"Magia de ataque habilitada -> tecla {cfg.magia_ataque.tecla.upper()}"
+                f" (piso de mana {cfg.magia_ataque.mana_minima:.0f}%)"
+            )
+        else:
+            log("Magia de ataque ligada mas battle list não calibrada (não sabe quando há combate) — desativada", "alerta")
     if cfg.usar_mana.ativo:
         comportamentos.append(UsarMana(cfg.usar_mana))
         log(
@@ -84,6 +105,12 @@ def _montar_loop(cfg, controlador, barramento, log) -> LoopBot:
             log(f"Drop de loot habilitado -> {len(cfg.drop.itens)} item(ns) cadastrado(s)")
         else:
             log("Drop de loot ligado mas sem itens ou sem inventário/tile calibrado — desativado", "alerta")
+    if cfg.cavebot.ativo:
+        if cfg.regioes.minimap_calibrado and cfg.cavebot.waypoints:
+            comportamentos.append(Cavebot(cfg.cavebot))
+            log(f"Cavebot habilitado -> {len(cfg.cavebot.waypoints)} waypoint(s)")
+        else:
+            log("Cavebot ligado mas sem waypoints ou sem minimapa calibrado — desativado", "alerta")
     motor = MotorDecisao(comportamentos, cooldown)
     seguranca = Seguranca(controlador, cfg.seguranca, log)
     seguranca.registrar_hotkeys()

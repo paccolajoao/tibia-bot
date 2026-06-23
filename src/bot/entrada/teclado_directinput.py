@@ -34,6 +34,12 @@ class EntradaDirectInput:
         self._pdi.click()
         atraso_humano(self._pos)
 
+    def clicar_direito(self, x: int, y: int) -> None:
+        atraso_humano(self._pre)
+        self._pdi.moveTo(x, y)
+        self._pdi.click(button="right")
+        atraso_humano(self._pos)
+
     def arrastar(self, x1: int, y1: int, x2: int, y2: int) -> None:
         atraso_humano(self._pre)
         self._pdi.moveTo(x1, y1)

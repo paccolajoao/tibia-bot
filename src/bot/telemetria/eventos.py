@@ -94,6 +94,8 @@ class EventoStats:
     curas_leve: int = 0
     usos_mana: int = 0
     abates: int = 0
+    passos_cavebot: int = 0
+    magias_ataque: int = 0
     tipo: str = "stats"
 
     def to_dict(self) -> dict[str, Any]:

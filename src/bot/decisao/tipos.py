@@ -10,6 +10,7 @@ from typing import Any
 class TipoAcao(Enum):
     PRESSIONAR_TECLA = auto()
     CLICAR = auto()
+    CLICAR_DIREITO = auto()  # clique-direito em `ponto` (usar escada/alavanca no cavebot)
     ARRASTAR = auto()  # drag-and-drop: de `ponto` para `ponto_destino` (drop de item)
     NENHUMA = auto()
 

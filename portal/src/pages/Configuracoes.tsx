@@ -8,9 +8,10 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampoNumero, CampoSelect, CampoSwitch, CampoTecla, CampoTexto } from "@/components/campos"
 import { DropItens } from "@/components/DropItens"
+import { Waypoints } from "@/components/Waypoints"
 import { useTelemetria } from "@/hooks/useTelemetria"
 import { api } from "@/lib/api"
-import type { Config, ItemDrop, Meta, Regiao } from "@/lib/types"
+import type { Config, ItemDrop, Meta, Regiao, Waypoint } from "@/lib/types"
 import { getIn, setIn } from "@/lib/utils"
 
 function Secao({ titulo, descricao, children }: { titulo: string; descricao?: string; children: React.ReactNode }) {
@@ -127,6 +128,8 @@ export function Configuracoes() {
     regiaoCalibrada(cfg.regioes.inventario) &&
     regiaoCalibrada(cfg.regioes.drop_tile) &&
     (cfg.drop.itens?.length ?? 0) >= 1
+  const cavebotPronto =
+    regiaoCalibrada(cfg.regioes.minimap) && (cfg.cavebot.waypoints?.length ?? 0) >= 1
   const manaAoVivo = tele.estado?.mana_pct
 
   return (
@@ -156,6 +159,8 @@ export function Configuracoes() {
           <TabsTrigger value="alvo">Alvo</TabsTrigger>
           <TabsTrigger value="acoes">Saque & Comer</TabsTrigger>
           <TabsTrigger value="drop">Drop</TabsTrigger>
+          <TabsTrigger value="cavebot">Cavebot</TabsTrigger>
+          <TabsTrigger value="magia">Magia de ataque</TabsTrigger>
           <TabsTrigger value="mana">Usar Mana</TabsTrigger>
           <TabsTrigger value="captura">Captura</TabsTrigger>
           <TabsTrigger value="visao">Visão</TabsTrigger>
@@ -200,7 +205,6 @@ export function Configuracoes() {
               />
               <LinhaRecurso
                 titulo="Drop de loot"
-                emTeste
                 descricao="Arrasta itens cadastrados da backpack para um tile do chão (reconhece por imagem)."
                 ativo={v("drop.ativo")}
                 onChange={(x) => set("drop.ativo", x)}
@@ -211,11 +215,31 @@ export function Configuracoes() {
                 }
               />
               <LinhaRecurso
+                titulo="Magia de ataque"
+                emTeste
+                descricao="Em combate, aperta UMA hotkey de ataque (você monta a rotação de magias nessa hotkey no Tibia). Respeita um piso de mana."
+                ativo={v("magia_ataque.ativo")}
+                onChange={(x) => set("magia_ataque.ativo", x)}
+                alerta={!battleCalibrada ? "Requer a battle list calibrada (p/ saber quando há combate)." : undefined}
+              />
+              <LinhaRecurso
                 titulo="Usar mana (treino de Magic Level)"
                 emTeste
                 descricao="Gasta mana apertando uma tecla enquanto a mana estiver alta (histerese). Ajuste o limiar na aba Usar Mana."
                 ativo={v("usar_mana.ativo")}
                 onChange={(x) => set("usar_mana.ativo", x)}
+              />
+              <LinhaRecurso
+                titulo="Cavebot (navegação)"
+                emTeste
+                descricao="Caminha a hunt clicando waypoints no minimapa (o Tibia faz o pathfinding). Cede ao combate; trata escadas/buracos. A rota repete em loop."
+                ativo={v("cavebot.ativo")}
+                onChange={(x) => set("cavebot.ativo", x)}
+                alerta={
+                  !cavebotPronto
+                    ? "Requer o minimapa calibrado (aba Calibração) e ≥1 waypoint (aba Cavebot)."
+                    : undefined
+                }
               />
             </CardContent>
           </Card>
@@ -228,8 +252,8 @@ export function Configuracoes() {
             <CampoNumero label="HP crítico" sufixo="%" min={0} max={100} valor={v("cura.hp_critico")} onChange={(x) => set("cura.hp_critico", x)} dica="Abaixo disso, cura forte." />
             <CampoNumero label="HP baixo" sufixo="%" valor={v("cura.hp_baixo")} onChange={(x) => set("cura.hp_baixo", x)} dica="Abaixo disso, cura leve." />
             <CampoNumero label="Mana baixa" sufixo="%" valor={v("cura.mana_baixa")} onChange={(x) => set("cura.mana_baixa", x)} dica="Abaixo disso, poção de mana." />
-            <CampoTecla label="Tecla cura forte" valor={v("cura.tecla_cura_forte")} onChange={(x) => set("cura.tecla_cura_forte", x)} />
-            <CampoTecla label="Tecla cura leve" valor={v("cura.tecla_cura_leve")} onChange={(x) => set("cura.tecla_cura_leve", x)} />
+            <CampoTecla label="Tecla cura forte (HP crítico)" dica="Pode ser poção OU magia — o que você bindar nessa hotkey no Tibia. Dispara no HP crítico." valor={v("cura.tecla_cura_forte")} onChange={(x) => set("cura.tecla_cura_forte", x)} />
+            <CampoTecla label="Tecla cura leve (HP baixo)" dica="Pode ser magia OU poção. Dispara no HP baixo (acima do crítico)." valor={v("cura.tecla_cura_leve")} onChange={(x) => set("cura.tecla_cura_leve", x)} />
             <CampoTecla label="Tecla poção mana" valor={v("cura.tecla_pocao_mana")} onChange={(x) => set("cura.tecla_pocao_mana", x)} />
           </Secao>
         </TabsContent>
@@ -272,6 +296,37 @@ export function Configuracoes() {
             <CampoNumero label="Intervalo entre drops" sufixo="s" step={0.5} valor={v("drop.intervalo_s")} onChange={(x) => set("drop.intervalo_s", x)} />
             <CampoNumero label="Prioridade" valor={v("drop.prioridade")} onChange={(x) => set("drop.prioridade", x)} dica="Abaixo de cura/alvo/saque." />
             <DropItens itens={(v("drop.itens") ?? []) as ItemDrop[]} onChange={(itens) => set("drop.itens", itens)} />
+          </Secao>
+        </TabsContent>
+
+        <TabsContent value="cavebot" className="space-y-6">
+          <Secao
+            titulo="Cavebot (navegação por waypoints)"
+            descricao="Clica pontos no minimapa em sequência (o Tibia pathfinda cada trecho); a chegada é detectada quando o minimapa para de rolar. Cede ao combate. Requer o minimapa calibrado (aba Calibração)."
+          >
+            <CampoSwitch label="Ativo" dica="Liga/desliga o cavebot (também na aba Recursos)." valor={v("cavebot.ativo")} onChange={(x) => set("cavebot.ativo", x)} />
+            <CampoNumero label="Prioridade" valor={v("cavebot.prioridade")} onChange={(x) => set("cavebot.prioridade", x)} dica="Baixa: cura/alvo/saque vêm antes (e o cavebot cede ao combate)." />
+            <CampoNumero label="Cooldown entre cliques" sufixo="s" step={0.1} min={0} valor={v("cavebot.cooldown_s")} onChange={(x) => set("cavebot.cooldown_s", x)} />
+            <CampoNumero label="Ticks parado p/ 'chegou'" step={1} min={1} valor={v("cavebot.parado_ticks")} onChange={(x) => set("cavebot.parado_ticks", x)} dica="Quantos ticks o minimapa precisa ficar estático para considerar que chegou." />
+            <CampoNumero label="Limiar de movimento" step={0.5} min={0} valor={v("cavebot.limiar_movimento")} onChange={(x) => set("cavebot.limiar_movimento", x)} dica="Diff médio por pixel acima disso = minimapa rolando. Aumente se detectar movimento parado." />
+            <CampoNumero label="Timeout do trecho" sufixo="s" step={0.5} min={0} valor={v("cavebot.timeout_trecho_s")} onChange={(x) => set("cavebot.timeout_trecho_s", x)} dica="Desiste do trecho e avança após este tempo (rede p/ clique perdido)." />
+            <CampoNumero label="Timeout de combate" sufixo="s" step={1} min={0} valor={v("cavebot.combate_timeout_s")} onChange={(x) => set("cavebot.combate_timeout_s", x)} dica="Se há criatura mas nenhuma morte por este tempo (bicho inalcançável), volta a andar em vez de travar. 0 = nunca desiste." />
+            <CampoNumero label="Limiar de troca de andar" step={1} min={0} valor={v("cavebot.limiar_troca_andar")} onChange={(x) => set("cavebot.limiar_troca_andar", x)} dica="Pico de mudança do minimapa que confirma escada/buraco/corda. Baixe se trocas não forem detectadas." />
+            <CampoNumero label="Tentativas de troca" step={1} min={1} valor={v("cavebot.tentativas_troca")} onChange={(x) => set("cavebot.tentativas_troca", x)} dica="Re-tentativas de um waypoint 'muda de andar' antes de seguir (best-effort, não trava)." />
+            <Waypoints waypoints={(v("cavebot.waypoints") ?? []) as Waypoint[]} onChange={(wps) => set("cavebot.waypoints", wps)} />
+          </Secao>
+        </TabsContent>
+
+        <TabsContent value="magia" className="space-y-6">
+          <Secao
+            titulo="Magia de ataque"
+            descricao="Em combate, aperta UMA hotkey de ataque periodicamente. A rotação de magias (exori → exori gran → ...) é montada no PRÓPRIO Tibia nessa hotkey. Requer a battle list calibrada (p/ saber quando há combate). Cede a cura/saque/alvo."
+          >
+            <CampoSwitch label="Ativo" dica="Liga/desliga (também na aba Recursos)." valor={v("magia_ataque.ativo")} onChange={(x) => set("magia_ataque.ativo", x)} />
+            <CampoTecla label="Tecla de ataque" dica="A hotkey onde você montou a rotação de magias no Tibia." valor={v("magia_ataque.tecla")} onChange={(x) => set("magia_ataque.tecla", x)} />
+            <CampoNumero label="Intervalo entre casts" sufixo="s" step={0.5} min={0} valor={v("magia_ataque.intervalo_s")} onChange={(x) => set("magia_ataque.intervalo_s", x)} dica="Espaçamento entre os toques na hotkey." />
+            <CampoNumero label="Mana mínima" sufixo="%" min={0} max={100} valor={v("magia_ataque.mana_minima")} onChange={(x) => set("magia_ataque.mana_minima", x)} dica="Não ataca abaixo disso — preserva mana p/ cura." />
+            <CampoNumero label="Prioridade" valor={v("magia_ataque.prioridade")} onChange={(x) => set("magia_ataque.prioridade", x)} dica="Abaixo de cura(100)/saque(85)/alvo(80)." />
           </Secao>
         </TabsContent>
 

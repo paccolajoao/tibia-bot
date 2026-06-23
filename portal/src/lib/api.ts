@@ -41,6 +41,7 @@ export const api = {
     battle_list?: Regiao
     inventario?: Regiao
     drop_tile?: Regiao
+    minimap?: Regiao
   }) => req<unknown>("/api/regioes", { method: "PUT", body: JSON.stringify(regioes) }),
 
   // import/export

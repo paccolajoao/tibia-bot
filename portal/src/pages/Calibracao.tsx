@@ -8,21 +8,23 @@ import { api } from "@/lib/api"
 import type { FrameCalibracao, Regiao } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-type Alvo = "hp" | "mana" | "battle_list" | "inventario" | "drop_tile"
+type Alvo = "hp" | "mana" | "battle_list" | "inventario" | "drop_tile" | "minimap"
 const ALVOS: { id: Alvo; rotulo: string; cor: string }[] = [
   { id: "hp", rotulo: "Barra de HP", cor: "var(--hp)" },
   { id: "mana", rotulo: "Barra de Mana", cor: "var(--mana)" },
   { id: "battle_list", rotulo: "Battle list (opcional)", cor: "var(--primary)" },
   { id: "inventario", rotulo: "Inventário (drop)", cor: "var(--success)" },
   { id: "drop_tile", rotulo: "Tile de drop", cor: "var(--warning)" },
+  { id: "minimap", rotulo: "Minimapa (cavebot)", cor: "var(--destructive)" },
 ]
-const ORDEM: Alvo[] = ["hp", "mana", "battle_list", "inventario", "drop_tile"]
+const ORDEM: Alvo[] = ["hp", "mana", "battle_list", "inventario", "drop_tile", "minimap"]
 const REGIOES_ZERO: Record<Alvo, Regiao> = {
   hp: [0, 0, 0, 0],
   mana: [0, 0, 0, 0],
   battle_list: [0, 0, 0, 0],
   inventario: [0, 0, 0, 0],
   drop_tile: [0, 0, 0, 0],
+  minimap: [0, 0, 0, 0],
 }
 
 interface RetDisplay {
@@ -52,6 +54,7 @@ export function Calibracao() {
           battle_list: c.regioes.battle_list,
           inventario: c.regioes.inventario,
           drop_tile: c.regioes.drop_tile,
+          minimap: c.regioes.minimap,
         })
       )
       .catch(() => {})
