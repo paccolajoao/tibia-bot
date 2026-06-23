@@ -13,6 +13,11 @@ from bot.decisao.tipos import Decisao, TipoAcao
 
 CHAVE_COOLDOWN = "usar_mana"
 
+# Mana cheia quase nunca lê exatamente 100% (bordas anti-aliased + dígitos sobre a
+# barra). Um perfil salvo com mana_alto=100 nunca dispararia; tratamos qualquer
+# limiar >= 100 como este valor alcançável.
+LIMIAR_CHEIO_INATINGIVEL = 97.0
+
 
 class UsarMana:
     nome = "usar_mana"
@@ -27,8 +32,9 @@ class UsarMana:
         if mana is None or mana.confianca < self.cfg.confianca_minima:
             return None
 
+        limiar = self.cfg.mana_alto if self.cfg.mana_alto < 100.0 else LIMIAR_CHEIO_INATINGIVEL
         pct = mana.percentual
-        if pct >= self.cfg.mana_alto:
+        if pct >= limiar:
             self._gastando = True
         elif pct < self.cfg.mana_alvo:
             self._gastando = False
@@ -41,7 +47,7 @@ class UsarMana:
             TipoAcao.PRESSIONAR_TECLA,
             tecla=self.cfg.tecla,
             motivo=(
-                f"Mana {pct:.0f}% >= {self.cfg.mana_alto:.0f}%"
+                f"Mana {pct:.0f}% >= {limiar:.0f}%"
                 f" -> usar mana ({self.cfg.tecla.upper()})"
             ),
             prioridade=self.prioridade,

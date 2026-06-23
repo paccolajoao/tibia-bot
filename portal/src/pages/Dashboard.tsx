@@ -34,13 +34,22 @@ function Barra({ rotulo, pct, cor }: { rotulo: string; pct: number | null; cor: 
   )
 }
 
-function Estatistica({ rotulo, valor }: { rotulo: string; valor: string | number }) {
+function Estatistica({ rotulo, valor, sub }: { rotulo: string; valor: string | number; sub?: string }) {
   return (
     <div className="rounded-lg border border-border bg-background/40 p-3">
       <div className="text-2xl font-semibold tabular-nums">{valor}</div>
       <div className="text-xs text-muted-foreground">{rotulo}</div>
+      {sub && <div className="text-[10px] text-muted-foreground/70 tabular-nums">{sub}</div>}
     </div>
   )
+}
+
+/** Taxa por minuto formatada (ex.: "3.2/min"), a partir de um total e o uptime em segundos. */
+function porMinuto(total: number | undefined, uptime_s: number | undefined): string {
+  const n = total ?? 0
+  const min = (uptime_s ?? 0) / 60
+  if (min < 0.1) return "—"
+  return `${(n / min).toFixed(1)}/min`
 }
 
 function formatarTempo(s: number) {
@@ -137,15 +146,33 @@ export function Dashboard() {
             <Barra rotulo="HP" pct={e?.hp_pct ?? null} cor="var(--hp)" />
             <Barra rotulo="Mana" pct={e?.mana_pct ?? null} cor="var(--mana)" />
             <div className="grid grid-cols-2 gap-3 pt-2 sm:grid-cols-4">
-              <Estatistica rotulo="curas" valor={t.stats?.curas ?? 0} />
+              <Estatistica
+                rotulo="abates"
+                valor={t.stats?.abates ?? 0}
+                sub={porMinuto(t.stats?.abates, t.stats?.uptime_s)}
+              />
+              <Estatistica
+                rotulo="alvos (cliques)"
+                valor={t.stats?.ataques ?? 0}
+                sub={porMinuto(t.stats?.ataques, t.stats?.uptime_s)}
+              />
+              <Estatistica
+                rotulo="curas"
+                valor={t.stats?.curas ?? 0}
+                sub={`forte ${t.stats?.curas_forte ?? 0} · leve ${t.stats?.curas_leve ?? 0}`}
+              />
+              <Estatistica rotulo="saques" valor={t.stats?.saques ?? 0} sub={porMinuto(t.stats?.saques, t.stats?.uptime_s)} />
               <Estatistica rotulo="poções mana" valor={t.stats?.pocoes_mana ?? 0} />
-              <Estatistica rotulo="ataques" valor={t.stats?.ataques ?? 0} />
-              <Estatistica rotulo="saques" valor={t.stats?.saques ?? 0} />
+              <Estatistica rotulo="usos mana (treino)" valor={t.stats?.usos_mana ?? 0} />
               <Estatistica rotulo="refeições" valor={t.stats?.refeicoes ?? 0} />
               <Estatistica rotulo="uptime" valor={formatarTempo(t.stats?.uptime_s ?? 0)} />
               <Estatistica rotulo="fps" valor={(e?.fps ?? 0).toFixed(0)} />
               <Estatistica rotulo="tick" valor={e?.tick ?? 0} />
             </div>
+            <p className="text-[11px] text-muted-foreground/80">
+              Contagens refletem o que o bot <span className="italic">acionou</span> (inputs enviados), não
+              confirmação do cliente. "alvos" conta cliques de targeting; "abates" estima quedas na battle list.
+            </p>
           </CardContent>
         </Card>
 

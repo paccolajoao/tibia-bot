@@ -40,6 +40,7 @@ export interface VisaoConfig {
 }
 
 export interface CuraConfig {
+  ativo: boolean
   hp_critico: number
   hp_baixo: number
   mana_baixa: number
@@ -50,6 +51,7 @@ export interface CuraConfig {
 }
 
 export interface AlvoConfig {
+  ativo: boolean
   prioridade: number
   confianca_minima: number
   s_min: number
@@ -182,10 +184,14 @@ export interface TelemetriaDecisao {
 export interface TelemetriaStats {
   tipo: "stats"
   curas: number
+  curas_forte?: number
+  curas_leve?: number
   pocoes_mana: number
+  usos_mana?: number
   ataques?: number
   refeicoes?: number
   saques?: number
+  abates?: number
   uptime_s: number
 }
 

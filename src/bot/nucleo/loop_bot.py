@@ -348,6 +348,9 @@ class LoopBot(threading.Thread):
         n = det.n_criaturas
         if self._ultimo_n_criaturas is not None and n < self._ultimo_n_criaturas:
             self.ctx.estado_comportamentos["saque_morte_ts"] = ts
+            # Aproxima "abates": uma criatura também pode ter saído da battle list
+            # andando p/ fora da tela — é estimativa, não confirmação do cliente.
+            self.ctx.estatisticas.abates += self._ultimo_n_criaturas - n
         self._ultimo_n_criaturas = n
 
     def _verificar_frames_pretos(self, ts: float) -> None:
@@ -493,5 +496,9 @@ class LoopBot(threading.Thread):
                 ataques=e.ataques,
                 refeicoes=e.refeicoes,
                 saques=e.saques,
+                curas_forte=e.curas_forte,
+                curas_leve=e.curas_leve,
+                usos_mana=e.usos_mana,
+                abates=e.abates,
             )
         )

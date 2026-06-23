@@ -18,6 +18,9 @@ from bot.decisao.comportamentos.auto_cura import AutoCura  # noqa: E402
 from bot.decisao.comportamentos.comer import Comer  # noqa: E402
 from bot.decisao.comportamentos.drop import Drop  # noqa: E402
 from bot.decisao.comportamentos.saque import Saque  # noqa: E402
+from bot.decisao.comportamentos.usar_mana import (
+    CHAVE_COOLDOWN as CHAVE_COOLDOWN_USAR_MANA,  # noqa: E402
+)
 from bot.decisao.comportamentos.usar_mana import UsarMana  # noqa: E402
 from bot.decisao.cooldown import GerenciadorCooldown  # noqa: E402
 from bot.decisao.motor import MotorDecisao  # noqa: E402
@@ -46,15 +49,24 @@ def _montar_loop(cfg, controlador, barramento, log) -> LoopBot:
         obs_altura=cfg.captura.obs_altura,
     )
     entrada = EntradaDirectInput(cfg.entrada.atraso_pre_ms, cfg.entrada.atraso_pos_ms)
-    usar_mana_cd = {cfg.usar_mana.tecla: cfg.usar_mana.cooldown_s} if cfg.usar_mana.ativo else {}
+    # cooldown do usar-mana é chaveado pela CHAVE_COOLDOWN da Decisao ("usar_mana"),
+    # não pela tecla — senão o motor consulta uma chave que não existe no gerenciador.
+    usar_mana_cd = {CHAVE_COOLDOWN_USAR_MANA: cfg.usar_mana.cooldown_s} if cfg.usar_mana.ativo else {}
     cooldown = GerenciadorCooldown({**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s, **usar_mana_cd})
-    comportamentos = [AutoCura(cfg.cura, cfg.visao.confianca_minima)]
+    comportamentos = []
+    if cfg.cura.ativo:
+        comportamentos.append(AutoCura(cfg.cura, cfg.visao.confianca_minima))
+    else:
+        log("Auto-cura desligada (recurso desativado na config)", "alerta")
     if cfg.regioes.battle_list_calibrado:
-        comportamentos.append(Alvo(cfg.alvo, cfg.visao.confianca_minima))
-        log("Targeting habilitado (battle list calibrada)")
-        if cfg.saque.ativo:
-            comportamentos.append(Saque(cfg.saque))
-            log(f"Auto-loot (Quick Loot) habilitado -> tecla {cfg.saque.tecla.upper()}")
+        if cfg.alvo.ativo:
+            comportamentos.append(Alvo(cfg.alvo, cfg.visao.confianca_minima))
+            log("Targeting habilitado (battle list calibrada)")
+            if cfg.saque.ativo:
+                comportamentos.append(Saque(cfg.saque))
+                log(f"Auto-loot (Quick Loot) habilitado -> tecla {cfg.saque.tecla.upper()}")
+        else:
+            log("Targeting desligado (recurso desativado na config)")
     else:
         log("Targeting/auto-loot desligados — battle list não calibrada (rode calibrar.py)")
     if cfg.usar_mana.ativo:

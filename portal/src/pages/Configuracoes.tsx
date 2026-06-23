@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react"
-import { Save, RotateCcw, Loader2 } from "lucide-react"
+import { Save, RotateCcw, Loader2, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampoNumero, CampoSelect, CampoSwitch, CampoTecla, CampoTexto } from "@/components/campos"
 import { DropItens } from "@/components/DropItens"
+import { useTelemetria } from "@/hooks/useTelemetria"
 import { api } from "@/lib/api"
-import type { Config, ItemDrop, Meta } from "@/lib/types"
+import type { Config, ItemDrop, Meta, Regiao } from "@/lib/types"
 import { getIn, setIn } from "@/lib/utils"
 
 function Secao({ titulo, descricao, children }: { titulo: string; descricao?: string; children: React.ReactNode }) {
@@ -22,11 +25,49 @@ function Secao({ titulo, descricao, children }: { titulo: string; descricao?: st
   )
 }
 
+/** Linha da aba Recursos: liga/desliga uma feature com descrição, selo "em teste" e alerta de dependência. */
+function LinhaRecurso({
+  titulo,
+  descricao,
+  ativo,
+  onChange,
+  emTeste,
+  alerta,
+}: {
+  titulo: string
+  descricao: string
+  ativo: boolean
+  onChange: (v: boolean) => void
+  emTeste?: boolean
+  alerta?: string
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-background/40 p-4">
+      <div className="grid gap-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{titulo}</span>
+          {emTeste && <Badge variant="warning">em teste</Badge>}
+        </div>
+        <p className="text-sm text-muted-foreground">{descricao}</p>
+        {ativo && alerta && (
+          <p className="flex items-center gap-1.5 text-xs text-warning">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" /> {alerta}
+          </p>
+        )}
+      </div>
+      <Switch checked={ativo} onCheckedChange={onChange} />
+    </div>
+  )
+}
+
+const regiaoCalibrada = (r: Regiao | undefined) => Array.isArray(r) && r.some((n) => n !== 0)
+
 export function Configuracoes() {
   const [cfg, setCfg] = useState<Config | null>(null)
   const [meta, setMeta] = useState<Meta | null>(null)
   const [sujo, setSujo] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const tele = useTelemetria() // mana ao vivo p/ ajudar a calibrar o limiar do "usar mana"
 
   useEffect(() => {
     Promise.all([api.getConfig(), api.meta()])
@@ -80,6 +121,14 @@ export function Configuracoes() {
     rotulo: b,
   }))
 
+  // dependências de calibração p/ os alertas da aba Recursos
+  const battleCalibrada = regiaoCalibrada(cfg.regioes.battle_list)
+  const dropPronto =
+    regiaoCalibrada(cfg.regioes.inventario) &&
+    regiaoCalibrada(cfg.regioes.drop_tile) &&
+    (cfg.drop.itens?.length ?? 0) >= 1
+  const manaAoVivo = tele.estado?.mana_pct
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -100,8 +149,9 @@ export function Configuracoes() {
         </div>
       </div>
 
-      <Tabs defaultValue="cura">
+      <Tabs defaultValue="recursos">
         <TabsList className="flex w-full flex-wrap justify-start gap-1">
+          <TabsTrigger value="recursos">Recursos</TabsTrigger>
           <TabsTrigger value="cura">Cura</TabsTrigger>
           <TabsTrigger value="alvo">Alvo</TabsTrigger>
           <TabsTrigger value="acoes">Saque & Comer</TabsTrigger>
@@ -112,9 +162,70 @@ export function Configuracoes() {
           <TabsTrigger value="sistema">Sistema</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="recursos" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recursos do bot</CardTitle>
+              <CardDescription>
+                Ligue/desligue cada funcionalidade. Os ajustes finos de cada uma ficam nas abas ao lado.
+                Mudanças valem no próximo start do bot.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              <LinhaRecurso
+                titulo="Auto-cura"
+                descricao="Cura HP e bebe poção de mana por limiares. Recomendado manter sempre ligado."
+                ativo={v("cura.ativo")}
+                onChange={(x) => set("cura.ativo", x)}
+              />
+              <LinhaRecurso
+                titulo="Targeting (alvo)"
+                descricao="Ataca a criatura mais próxima detectada na battle list."
+                ativo={v("alvo.ativo")}
+                onChange={(x) => set("alvo.ativo", x)}
+                alerta={!battleCalibrada ? "Requer a battle list calibrada (aba Calibração)." : undefined}
+              />
+              <LinhaRecurso
+                titulo="Auto-loot (saque)"
+                descricao="Dispara o Quick Loot após cada kill. Desligue se sua conta já faz loot automático."
+                ativo={v("saque.ativo")}
+                onChange={(x) => set("saque.ativo", x)}
+                alerta={!battleCalibrada ? "Requer a battle list calibrada (aba Calibração)." : undefined}
+              />
+              <LinhaRecurso
+                titulo="Auto-comer"
+                descricao="Aperta a hotkey de comida periodicamente."
+                ativo={v("comer.ativo")}
+                onChange={(x) => set("comer.ativo", x)}
+              />
+              <LinhaRecurso
+                titulo="Drop de loot"
+                emTeste
+                descricao="Arrasta itens cadastrados da backpack para um tile do chão (reconhece por imagem)."
+                ativo={v("drop.ativo")}
+                onChange={(x) => set("drop.ativo", x)}
+                alerta={
+                  !dropPronto
+                    ? "Requer inventário + tile de drop calibrados (aba Calibração) e ≥1 item cadastrado (aba Drop)."
+                    : undefined
+                }
+              />
+              <LinhaRecurso
+                titulo="Usar mana (treino de Magic Level)"
+                emTeste
+                descricao="Gasta mana apertando uma tecla enquanto a mana estiver alta (histerese). Ajuste o limiar na aba Usar Mana."
+                ativo={v("usar_mana.ativo")}
+                onChange={(x) => set("usar_mana.ativo", x)}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="cura" className="space-y-6">
           <Secao titulo="Auto-cura" descricao="Limiares de HP/Mana e teclas de cura (prioridade máxima).">
-            <CampoNumero label="HP crítico" sufixo="%" valor={v("cura.hp_critico")} onChange={(x) => set("cura.hp_critico", x)} dica="Abaixo disso, cura forte." />
+            <CampoSwitch label="Ativo" dica="Liga/desliga a auto-cura (também na aba Recursos)." valor={v("cura.ativo")} onChange={(x) => set("cura.ativo", x)} />
+            <div className="hidden sm:block" />
+            <CampoNumero label="HP crítico" sufixo="%" min={0} max={100} valor={v("cura.hp_critico")} onChange={(x) => set("cura.hp_critico", x)} dica="Abaixo disso, cura forte." />
             <CampoNumero label="HP baixo" sufixo="%" valor={v("cura.hp_baixo")} onChange={(x) => set("cura.hp_baixo", x)} dica="Abaixo disso, cura leve." />
             <CampoNumero label="Mana baixa" sufixo="%" valor={v("cura.mana_baixa")} onChange={(x) => set("cura.mana_baixa", x)} dica="Abaixo disso, poção de mana." />
             <CampoTecla label="Tecla cura forte" valor={v("cura.tecla_cura_forte")} onChange={(x) => set("cura.tecla_cura_forte", x)} />
@@ -125,6 +236,8 @@ export function Configuracoes() {
 
         <TabsContent value="alvo" className="space-y-6">
           <Secao titulo="Targeting" descricao="Requer battle list calibrada. Clica/ataca a criatura mais próxima.">
+            <CampoSwitch label="Ativo" dica="Liga/desliga o targeting (também na aba Recursos)." valor={v("alvo.ativo")} onChange={(x) => set("alvo.ativo", x)} />
+            <div className="hidden sm:block" />
             <CampoNumero label="Prioridade" valor={v("alvo.prioridade")} onChange={(x) => set("alvo.prioridade", x)} dica="Abaixo da cura (100)." />
             <CampoNumero label="Recompromisso" sufixo="s" step={0.5} valor={v("alvo.recompromisso_s")} onChange={(x) => set("alvo.recompromisso_s", x)} dica="Não troca de alvo por este tempo após atacar." />
             <CampoNumero label="Confiança mínima" step={0.05} min={0} max={1} valor={v("alvo.confianca_minima")} onChange={(x) => set("alvo.confianca_minima", x)} />
@@ -163,13 +276,20 @@ export function Configuracoes() {
         </TabsContent>
 
         <TabsContent value="mana" className="space-y-6">
-          <Secao titulo="Usar Mana (treino)" descricao="Gasta mana apertando uma tecla enquanto a mana estiver alta (histerese).">
+          <Secao titulo="Usar Mana (treino de Magic Level)" descricao="Aperta uma tecla (ex.: cura forte) enquanto a mana está alta, para gastar mana e treinar ML. A histerese evita oscilar na borda: começa a gastar em 'mana alto' e só para abaixo de 'mana alvo'.">
             <CampoSwitch label="Ativo" valor={v("usar_mana.ativo")} onChange={(x) => set("usar_mana.ativo", x)} />
-            <CampoTecla label="Tecla" valor={v("usar_mana.tecla")} onChange={(x) => set("usar_mana.tecla", x)} />
-            <CampoNumero label="Mana alto" sufixo="%" valor={v("usar_mana.mana_alto")} onChange={(x) => set("usar_mana.mana_alto", x)} dica="Acima disso, começa a gastar." />
-            <CampoNumero label="Mana alvo" sufixo="%" valor={v("usar_mana.mana_alvo")} onChange={(x) => set("usar_mana.mana_alvo", x)} dica="Para de gastar abaixo disso." />
-            <CampoNumero label="Cooldown" sufixo="s" step={0.5} valor={v("usar_mana.cooldown_s")} onChange={(x) => set("usar_mana.cooldown_s", x)} />
-            <CampoNumero label="Prioridade" valor={v("usar_mana.prioridade")} onChange={(x) => set("usar_mana.prioridade", x)} />
+            <CampoTecla label="Tecla" dica="Qualquer spell que gaste mana (cura forte serve)." valor={v("usar_mana.tecla")} onChange={(x) => set("usar_mana.tecla", x)} />
+            <CampoNumero label="Mana alto" sufixo="%" min={0} max={100} valor={v("usar_mana.mana_alto")} onChange={(x) => set("usar_mana.mana_alto", x)} dica="A partir daqui começa a gastar. Mana cheia raramente lê 100% (bordas/dígitos) → use ~95%." />
+            <CampoNumero label="Mana alvo" sufixo="%" min={0} max={100} valor={v("usar_mana.mana_alvo")} onChange={(x) => set("usar_mana.mana_alvo", x)} dica="Para de gastar abaixo disso (deixa folga p/ curar)." />
+            <CampoNumero label="Cooldown" sufixo="s" step={0.5} min={0} valor={v("usar_mana.cooldown_s")} onChange={(x) => set("usar_mana.cooldown_s", x)} />
+            <CampoNumero label="Prioridade" valor={v("usar_mana.prioridade")} onChange={(x) => set("usar_mana.prioridade", x)} dica="Baixa por padrão (roda quando cura/alvo/saque não têm nada a fazer)." />
+            <p className="rounded-md border border-border bg-background/40 p-2.5 text-xs text-muted-foreground sm:col-span-2">
+              Mana lida agora:{" "}
+              <span className="font-medium tabular-nums text-foreground">
+                {manaAoVivo == null ? "— (bot parado/desconectado)" : `${manaAoVivo.toFixed(0)}%`}
+              </span>
+              {" "}— use este valor com a mana cheia para escolher o "mana alto".
+            </p>
           </Secao>
         </TabsContent>
 

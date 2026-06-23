@@ -85,6 +85,7 @@ class VisaoConfig(BaseModel):
 
 
 class CuraConfig(BaseModel):
+    ativo: bool = True  # liga/desliga o comportamento de auto-cura
     hp_critico: float = 35.0
     hp_baixo: float = 60.0
     mana_baixa: float = 40.0
@@ -99,6 +100,7 @@ class CuraConfig(BaseModel):
 class AlvoConfig(BaseModel):
     """Parâmetros do comportamento de targeting (alvo.py)."""
 
+    ativo: bool = True  # liga/desliga o targeting (também exige battle list calibrada)
     prioridade: int = 80  # abaixo de auto_cura (100): sobreviver antes de atacar
     confianca_minima: float = 0.6
     s_min: int = 60  # saturação mínima do mini HP-bar da criatura na battle list
@@ -163,7 +165,10 @@ class UsarManaConfig(BaseModel):
 
     ativo: bool = False
     tecla: str = "f5"          # tecla a pressionar (normalmente cura forte)
-    mana_alto: float = 100.0   # acima disso, começa a gastar mana
+    # ATENÇÃO: mana cheia raramente lê exatamente 100% (anti-aliasing de borda +
+    # dígitos sobre a barra a deixam em ~96-99%). Por isso o default é 95, e o
+    # comportamento trata mana_alto >= 100 como ~97% (ver usar_mana.py).
+    mana_alto: float = 95.0    # a partir daqui, começa a gastar mana
     mana_alvo: float = 80.0    # para de gastar abaixo disso (histerese)
     confianca_minima: float = 0.6
     cooldown_s: float = 1.0    # intervalo mínimo entre presses

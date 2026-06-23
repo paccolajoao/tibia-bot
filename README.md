@@ -10,10 +10,16 @@ estatísticas.
 - ✅ **Auto-comer** — aperta a hotkey de comida por tempo.
 - ✅ **Targeting** — detecta criaturas na *battle list* e **clica** para atacar (só quando não há alvo).
 - ✅ **Auto-loot** — dispara o **Quick Loot do Tibia** (hotkey) quando uma criatura morre.
-- ✅ **Drop de loot** — cadastre itens no portal (recortando o ícone) e o bot **arrasta** os
-  que encontrar na backpack para um tile do chão calibrado (reconhecimento por imagem).
+- ✅ **Usar mana (treino de Magic Level)** — aperta uma tecla (ex.: cura forte) enquanto a mana
+  está cheia, com histerese, para gastar mana e treinar ML.
+- ✅ **Drop de loot** — cadastre itens no portal (recortando o ícone **ou enviando um PNG/GIF**) e o
+  bot **arrasta** os que encontrar na backpack para um tile do chão calibrado (reconhecimento por
+  imagem, **multi-escala** e com máscara de transparência).
+- ✅ **Liga/desliga por feature** — aba **Recursos** no portal habilita/desabilita cada
+  funcionalidade (útil p/ desligar o loot em conta premium, ou recursos ainda em teste).
 - ✅ **Dashboard web ao vivo** — HP/Mana, detecção (criaturas/alvo), decisão atual, log de
-  raciocínio, preview anotado e estatísticas (curas, ataques, refeições, saques).
+  raciocínio, preview anotado e estatísticas (abates, alvos, curas forte/leve, poções e usos de
+  mana, saques, refeições) com taxas por minuto.
 
 > As barras de HP/Mana são lidas por amostragem de pixels (HSV), robusta aos **números
 > sobrepostos** na barra. A **mana** do Tibia esvazia da esquerda→direita: marque
@@ -82,6 +88,7 @@ frontend com hot-reload: `npm run dev` (porta 5173, com proxy de `/api` e `/ws` 
 | Poção de mana | `f1` | usar poção de mana |
 | Comida | `f7` | usar comida (auto-comer) |
 | Quick Loot | `f4` | **Quick Loot** (saque do corpo) — e configure suas *loot lists* |
+| Usar mana (treino) | `f5` | spell que gaste mana (a de cura forte serve) |
 
 > O **auto-loot usa o Quick Loot do Tibia**: a filtragem de itens (o que ignorar) é
 > configurada **nas loot lists do próprio cliente**, não no painel.
@@ -107,8 +114,10 @@ depois a de Mana e, opcional, a **battle list** (habilita targeting/auto-loot) e
 drop de loot, o **Inventário** (área da backpack varrida) e o **Tile de drop** (chão onde o
 item é solto). Clique **Salvar regiões** e **reinicie** o `executar.py` para aplicar.
 
-> **Drop de loot:** depois de calibrar inventário + tile, vá em **Configurações → Drop**,
-> ligue, e **cadastre os itens** clicando em *Adicionar item* e recortando o ícone na backpack.
+> **Drop de loot:** depois de calibrar inventário + tile, ligue na aba **Recursos** (ou em
+> **Configurações → Drop**) e **cadastre os itens** clicando em *Adicionar item* — recortando o
+> ícone de um frame capturado **ou enviando um PNG/GIF** do item. O reconhecimento é multi-escala,
+> então ícones de tamanho um pouco diferente ainda casam.
 
 > Prefere linha de comando? O `calibrar.py` ainda existe e grava no mesmo perfil ativo
 > (`.\.venv\Scripts\python.exe calibrar.py`).
@@ -127,18 +136,22 @@ A configuração agora é **gerenciada pelo portal** e persistida em **SQLite** 
 não mais editando YAML à mão. Cada **perfil** guarda um conjunto completo de config (ex.: um
 por personagem/caçada); a aba **Perfis** cria, ativa, duplica, renomeia e faz **import/export
 YAML**. Na 1ª execução, o `config.yaml` existente (ou `config.exemplo.yaml`) é migrado para um
-perfil "Padrão" automaticamente. A aba **Configurações** tem formulários validados para todas
-as seções abaixo:
+perfil "Padrão" automaticamente. A aba **Recursos** centraliza o liga/desliga de cada feature
+(com avisos de dependência e selo "em teste"); as demais abas têm formulários validados para
+todas as seções abaixo:
 
 | Seção | Campo | O que faz |
 |---|---|---|
+| `cura` | `ativo` | liga/desliga a auto-cura |
 | `cura` | `hp_critico` / `hp_baixo` | HP% que dispara cura forte / leve |
 | `cura` | `mana_baixa` | Mana% que dispara poção de mana |
 | `cura` | `tecla_*` | hotkeys no jogo (ex.: `f5`, `f6`, `f1`) |
 | `cura` | `cooldown_s` | intervalo mínimo por tecla (anti-spam) |
+| `alvo` | `ativo` | liga/desliga o targeting (também exige battle list calibrada) |
 | `alvo` | `tecla` n/a — usa **clique** | targeting clica na battle list; `confianca_minima`, `cooldown_s.atacar` |
-| `comer` | `tecla` / `intervalo_s` | hotkey de comida e de quantos em quantos segundos comer |
-| `saque` | `tecla` / `janela_s` / `prioridade` | hotkey de Quick Loot, por quanto tempo tentar após um kill, e prioridade (default 85, acima do alvo) |
+| `comer` | `ativo` / `tecla` / `intervalo_s` | hotkey de comida e de quantos em quantos segundos comer |
+| `saque` | `ativo` / `tecla` / `janela_s` / `prioridade` | hotkey de Quick Loot, por quanto tempo tentar após um kill, e prioridade (default 85, acima do alvo) |
+| `usar_mana` | `ativo` / `tecla` / `mana_alto` / `mana_alvo` | treino de ML: gasta mana com histerese. Mana cheia raramente lê 100% → use `mana_alto` ~95 |
 | `drop` | `ativo` / `itens` / `threshold` | drop de loot: itens (com template) a arrastar p/ o chão e a confiança do reconhecimento |
 | `visao` | `confianca_minima` | abaixo disso, ignora a leitura (não cura errado) |
 | `visao` | `hp.invertido` / `mana.invertido` | direção de preenchimento da barra (mana enche da direita) |
@@ -146,9 +159,10 @@ as seções abaixo:
 | `captura` | `fps_alvo` | ticks/seg do loop |
 | `seguranca` | `titulo_janela_contains` | título p/ detectar foco (`Tibia`) |
 
-`alvo` e `saque` só entram em ação quando a **battle list** está calibrada. `comer`/`saque`/`drop`
-têm um campo `ativo` para ligar/desligar. O **drop** exige `regioes.inventario` e
-`regioes.drop_tile` calibrados (na aba *Calibração*) e ao menos um item cadastrado.
+Toda feature tem um campo `ativo` (incl. `cura`/`alvo`); a aba **Recursos** é o jeito prático de
+ligar/desligar. `alvo` e `saque` só entram em ação quando a **battle list** está calibrada. O
+**drop** exige `regioes.inventario` e `regioes.drop_tile` calibrados (na aba *Calibração*) e ao
+menos um item cadastrado.
 
 ## Como funciona
 
@@ -166,10 +180,12 @@ têm um campo `ativo` para ligar/desligar. O **drop** exige `regioes.inventario`
   **HSV (brilho+saturação)** — funciona com HP mudando de cor, mana azul, é robusta aos
   **números sobre a barra** e respeita a **direção** (`invertido`, p/ a mana). Também detecta
   **criaturas na battle list** (mini HP-bars), se há **alvo atual**, e **itens no inventário**
-  (template matching) p/ o drop. Leitura "suja" (tooltip cobrindo) gera **confiança baixa** e é ignorada.
-- **Decisão:** comportamentos por **prioridade** (cura 100 > saque 85 > alvo 80 > drop 50 > comer 10);
-  o primeiro que quer agir vence o tick (uma ação por tick), com **cooldown** por hotkey.
-  Ações: **pressionar tecla** (cura/comer/saque), **clicar** (atacar na battle list) ou
+  (template matching **multi-escala**, com máscara de transparência) p/ o drop. Leitura "suja"
+  (tooltip cobrindo) gera **confiança baixa** e é ignorada.
+- **Decisão:** comportamentos por **prioridade** (cura 100 > saque 85 > alvo 80 > drop 50 >
+  usar_mana 15 > comer 10); o primeiro que quer agir vence o tick (uma ação por tick), com
+  **cooldown** por hotkey. Cada comportamento tem um `ativo` (liga/desliga na aba *Recursos*).
+  Ações: **pressionar tecla** (cura/comer/saque/usar_mana), **clicar** (atacar na battle list) ou
   **arrastar** (drop de item p/ o chão).
 - **Telemetria:** a fila é **best-effort** (descarta o mais antigo se cheia) — o loop do bot
   **nunca trava** por causa do painel.
@@ -198,10 +214,11 @@ tests/                           # testes offline (não precisam do jogo)
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Cobrem visão — barras e battle list — (contra imagens sintéticas), motor/cooldown, os
-comportamentos (cura, alvo, comer, saque), barramento, a ponte assíncrona, o **painel web**
-(serve o HTML + streaming WebSocket via TestClient) e testes de integração do loop com
-captura/entrada falsas — tudo **sem o jogo aberto**.
+Cobrem visão — barras, battle list e **inventário** (template matching multi-escala + máscara de
+alfa, contra imagens sintéticas) —, motor/cooldown, os comportamentos (cura, alvo, comer, saque,
+**usar mana**), barramento, a ponte assíncrona, o **painel web** (serve o HTML + streaming
+WebSocket via TestClient) e testes de integração do loop com captura/entrada falsas — tudo
+**sem o jogo aberto**.
 
 ## Roadmap
 

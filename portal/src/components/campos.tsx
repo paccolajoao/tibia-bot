@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 
 function Linha({ label, dica, children }: { label: string; dica?: string; children: ReactNode }) {
   return (
@@ -33,6 +34,8 @@ export function CampoNumero({
   max?: number
   sufixo?: string
 }) {
+  const foraDoLimite =
+    Number.isFinite(valor) && ((min != null && valor < min) || (max != null && valor > max))
   return (
     <Linha label={label} dica={dica}>
       <div className="relative">
@@ -43,7 +46,7 @@ export function CampoNumero({
           min={min}
           max={max}
           onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
-          className={sufixo ? "pr-10" : undefined}
+          className={cn(sufixo && "pr-10", foraDoLimite && "border-destructive focus-visible:ring-destructive")}
         />
         {sufixo && (
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -51,6 +54,11 @@ export function CampoNumero({
           </span>
         )}
       </div>
+      {foraDoLimite && (
+        <p className="text-xs text-destructive">
+          Valor fora do intervalo {min ?? "−∞"}–{max ?? "∞"}.
+        </p>
+      )}
     </Linha>
   )
 }

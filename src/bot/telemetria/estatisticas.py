@@ -9,11 +9,15 @@ from dataclasses import dataclass, field
 @dataclass
 class Estatisticas:
     inicio_ts: float = field(default_factory=time.perf_counter)
-    curas: int = 0  # curas de HP disparadas (forte + leve)
-    pocoes_mana: int = 0
-    ataques: int = 0  # cliques de ataque na battle list
+    curas: int = 0  # curas de HP disparadas (forte + leve) — total
+    curas_forte: int = 0  # subset: HP crítico -> cura forte
+    curas_leve: int = 0  # subset: HP baixo -> cura leve
+    pocoes_mana: int = 0  # poções de mana (HP/mana baixos)
+    usos_mana: int = 0  # descargas de mana p/ treino de ML (comportamento usar_mana)
+    ataques: int = 0  # cliques de alvo na battle list (targeting, não hits confirmados)
     refeicoes: int = 0  # presses de comida
     saques: int = 0  # presses de Quick Loot
+    abates: int = 0  # quedas detectadas na contagem da battle list (aproxima kills)
     _fps_ema: float = 0.0
 
     def registrar_acao(self, decisao) -> None:
@@ -21,14 +25,20 @@ class Estatisticas:
         recurso = decisao.dados.get("recurso")
         if recurso == "mana":
             self.pocoes_mana += 1
+        elif recurso == "mana_uso":
+            self.usos_mana += 1
         elif recurso == "alvo":
             self.ataques += 1
         elif recurso == "comida":
             self.refeicoes += 1
         elif recurso == "saque":
             self.saques += 1
-        else:
+        else:  # recurso == "hp" (cura de HP)
             self.curas += 1
+            if decisao.dados.get("nivel") == "critico":
+                self.curas_forte += 1
+            else:
+                self.curas_leve += 1
 
     def atualizar_fps(self, fps_instantaneo: float) -> None:
         alfa = 0.1

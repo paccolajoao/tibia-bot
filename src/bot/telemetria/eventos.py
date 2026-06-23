@@ -90,6 +90,10 @@ class EventoStats:
     ataques: int = 0
     refeicoes: int = 0
     saques: int = 0
+    curas_forte: int = 0
+    curas_leve: int = 0
+    usos_mana: int = 0
+    abates: int = 0
     tipo: str = "stats"
 
     def to_dict(self) -> dict[str, Any]:
