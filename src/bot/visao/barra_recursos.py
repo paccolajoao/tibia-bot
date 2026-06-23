@@ -27,7 +27,7 @@ def ler_percentual_barra(
     left, top, right, bottom = regiao
     roi = imagem[top:bottom, left:right]
     if roi.size == 0 or roi.shape[1] < 2:
-        return LeituraBarra(0.0, 0, 0, 0.0)
+        return LeituraBarra(0.0, 0.0)
 
     altura, largura = roi.shape[:2]
     hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
@@ -51,7 +51,7 @@ def ler_percentual_barra(
         percentual = (idx_ultimo + 1) / total * 100.0
 
     confianca = _confianca(preenchido, n_preench, total)
-    return LeituraBarra(percentual, total, n_preench, confianca)
+    return LeituraBarra(percentual, confianca)
 
 
 def _confianca(preenchido: np.ndarray, n_preench: int, total: int) -> float:

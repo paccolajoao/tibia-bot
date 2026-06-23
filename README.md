@@ -66,7 +66,12 @@ Para desenvolver/testar, use `requirements-dev.txt` (inclui pytest).
 > O **auto-loot usa o Quick Loot do Tibia**: a filtragem de itens (o que ignorar) é
 > configurada **nas loot lists do próprio cliente**, não no painel.
 
-**2) Calibrar** (uma vez, ou quando mudar o layout do cliente):
+**2) Tibia oficial (BattlEye)? Configure o OBS primeiro.** Se a calibração vier **preta**, o
+cliente está bloqueando a captura (`WDA_EXCLUDEFROMCAPTURE`) — siga o
+[passo a passo do OBS](#captura-via-obs-tibia-oficial--wda_excludefromcapture) e volte para a
+calibração. Em OT Server / cliente sem BattlEye, pule este passo (deixe `backend: auto`).
+
+**3) Calibrar** (uma vez, ou quando mudar o layout do cliente):
 
 ```powershell
 .\.venv\Scripts\python.exe calibrar.py
@@ -77,7 +82,7 @@ Abre uma captura da tela; **arraste um retângulo sobre a barra de HP**, ENTER, 
 auto-loot**; ESC pula. Ele imprime os valores lidos (confira) e salva as regiões em
 `config/config.yaml`.
 
-**3) Executar** (de preferência num terminal **Administrador**):
+**4) Executar** (de preferência num terminal **Administrador**):
 
 ```powershell
 .\.venv\Scripts\python.exe executar.py
@@ -105,7 +110,7 @@ Gerado a partir de `config.exemplo.yaml` (veja os comentários lá). Principais 
 | `comer` | `tecla` / `intervalo_s` | hotkey de comida e de quantos em quantos segundos comer |
 | `saque` | `tecla` / `janela_s` | hotkey de Quick Loot e por quanto tempo tentar após um kill |
 | `visao` | `confianca_minima` | abaixo disso, ignora a leitura (não cura errado) |
-| `captura` | `backend` | `auto` \| `bettercam` \| `mss` |
+| `captura` | `backend` | `auto` \| `bettercam` \| `wgc` \| `mss` \| `obs` \| `tibia_arquivo` |
 | `captura` | `fps_alvo` | ticks/seg do loop |
 | `seguranca` | `titulo_janela_contains` | título p/ detectar foco (`Tibia`) |
 
@@ -138,7 +143,7 @@ têm um campo `ativo` para ligar/desligar.
 ```
 executar.py / calibrar.py        # entrypoints
 src/bot/
-  captura/    base · dxgi · wgc · mss_fallback · fabrica
+  captura/    base · dxgi · wgc · mss_fallback · obs_virtualcam · mapeamento · tibia_arquivo · fabrica
   visao/      barra_recursos · lista_batalha · anotador · tipos
   decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque)
   telemetria/ eventos · barramento · estatisticas
@@ -184,13 +189,80 @@ Cross-cutting: OCR (`pytesseract`) para números absolutos de HP/Mana no painel;
 **bot-driven** (abrir corpo + template matching de sprites) para uma lista de ignorados
 gerida no portal.
 
+## Captura via OBS (Tibia oficial / WDA_EXCLUDEFROMCAPTURE)
+
+O Tibia oficial (BattlEye) usa `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)`: o **compositor
+do Windows** apaga a janela de TODO caminho de captura externo (mss, WGC, DXGI, PrintWindow,
+PrintScreen → tudo preto). O **OBS é whitelisted pelo BattlEye**, então a captura dele enxerga o
+jogo. Usamos a **OBS Virtual Camera** como fonte de frames (~30-60 FPS, ao vivo) — bem melhor que
+o fallback lento `tibia_arquivo` (~3 FPS via hotkey de screenshot).
+
+> ⚠️ Automatizar o Tibia oficial viola o ToS e pode resultar em ban pelo BattlEye. O caminho OBS
+> não *adultera* o cliente, mas não torna a automação compatível com as regras. Use por sua conta.
+
+### Passo a passo do OBS
+
+**1. Instalar o OBS Studio**
+- Baixe em <https://obsproject.com> e instale. Abra o OBS (não precisa de admin).
+- Se aparecer o "Assistente de configuração automática", pode cancelar — vamos configurar à mão.
+
+**2. Deixar o Tibia em janela**
+- No Tibia: **Options → Graphics → Full screen mode: OFF** (janela ou sem bordas).
+- Posicione a janela do Tibia onde for ficar durante o uso (a captura segue a janela em runtime,
+  mas é mais simples deixá-la fixa).
+
+**3. Casar a resolução do canvas com a janela do Tibia** *(passo que deixa o clique preciso)*
+- No OBS: **Settings (Configurações) → Video (Vídeo)**.
+- Em **Base (Canvas) Resolution**, coloque o **mesmo tamanho da janela do Tibia**
+  (ex.: `1280x720`, `1600x900`, `1920x1080`). Em dúvida, use a resolução do seu monitor.
+- **Output (Scaled) Resolution**: igual à Base. **FPS**: 30 ou 60. Aplique e feche.
+
+**4. Adicionar a fonte de captura do Tibia**
+- No painel **Sources (Fontes)**, clique em **+** → **Game Capture (Captura de Jogo)**
+  → *Create new* → OK.
+- Em **Mode (Modo)**, escolha **Capture specific window** e selecione o cliente do Tibia na lista.
+  (Se o Game Capture vier preto, troque a fonte para **Window Capture (Captura de Janela)** com o
+  método de captura **Windows 10 (1903 and up)** / **WGC** — também funciona com o Tibia.)
+- **IMPORTANTE:** desmarque/oculte o cursor — em **Game Capture** desligue **Capture Cursor**
+  (em Window Capture, **Cursor: OFF**). O cursor na captura confunde a leitura das barras.
+- Clique **OK**.
+
+**5. Encaixar a captura no canvas 1:1**
+- Com a fonte selecionada na cena, clique nela com o botão direito → **Transform (Transformar) →
+  Fit to screen (Ajustar à tela)** (atalho **Ctrl+F**). A imagem do Tibia deve preencher todo o
+  canvas, sem barras pretas nas laterais. Se sobrar borda preta, revise o passo 3 (a resolução do
+  canvas tem que bater com a da janela do Tibia).
+
+**6. Ligar a câmera virtual**
+- No canto inferior direito (**Controls**), clique em **Start Virtual Camera**
+  (Iniciar Câmera Virtual). Deixe o OBS **aberto** enquanto usar o bot.
+
+**7. Apontar o bot para o OBS**
+- No `config/config.yaml`, seção `captura`: defina **`backend: obs`**.
+- Opcional, mas recomendado: `pip install pygrabber` — assim o bot acha a câmera pelo nome
+  (`obs_device_nome: OBS Virtual Camera`). Sem o pygrabber, ajuste `obs_device_index` (0, 1, 2…)
+  até cair na câmera virtual (se tiver webcam física, o índice da virtual costuma ser o maior).
+
+**8. Calibrar e rodar**
+- `python calibrar.py` — agora o frame **não vem preto**; marque HP, mana e battle list. A
+  calibração grava `mapeamento_obs` e confere se o canvas bate 1:1 com a janela (avisa se não).
+- `python executar.py` — confira no painel HP/mana atualizando a ~15 FPS.
+
+**Como o clique funciona com o OBS:** as regiões calibradas ficam em **coords do canvas do OBS**;
+o clique de targeting é convertido para a tela em runtime lendo a **posição viva da janela do
+Tibia** (mover a janela não exige recalibrar). Com `backend: obs`, o auto-fallback para `mss` fica
+desativado (mss vem preto no Tibia). Se o canvas **não** ficou 1:1, o bot ainda aplica a escala —
+mas o 1:1 deixa o clique mais exato.
+
 ## Troubleshooting
 
-- **Tela PRETA na calibração / bot não enxerga o jogo** → captura voltando preta. Duas causas:
-  1. **Cliente em DX12/OpenGL + backend `mss`** (GDI não lê GPU). No 3.13 o backend **WGC**
+- **Tela PRETA na calibração / bot não enxerga o jogo** → captura voltando preta. Causas:
+  1. **Tibia oficial com BattlEye** (`WDA_EXCLUDEFROMCAPTURE`) → mss/WGC/DXGI/PrintWindow vêm
+     todos pretos. Use **`backend: obs`** (seção acima) — é a saída recomendada.
+  2. **Cliente em DX12/OpenGL + backend `mss`** (GDI não lê GPU). No 3.13 o backend **WGC**
      resolve — confirme no log de inicialização "backend WGC ... ativo". Se aparecer "mss",
      instale a lib: `pip install windows-capture`, ou force `backend: wgc` no `config.yaml`.
-  2. **Tela cheia EXCLUSIVA** derrota até WGC/DXGI (ignora o compositor do Windows). Em
+  3. **Tela cheia EXCLUSIVA** derrota até WGC/DXGI (ignora o compositor do Windows). Em
      **Options → Graphics**, desligue **Full screen mode** e use **janela / sem bordas**.
 
   O `calibrar.py` salva o print em `dados/capturas/calibracao_screenshot.png` e avisa quando

@@ -5,9 +5,13 @@ bettercam==1.0.0 ; python_version < "3.13"   # DXGI rápido; pulado no 3.13
 windows-capture>=2.0.0 ; sys_platform == "win32"  # Windows Graphics Capture: pega DX12/OpenGL, roda no 3.13
 mss>=9.0.1                                     # fallback Python puro/GDI (não captura DX12)
 
-# Visão computacional
+# Visão computacional (opencv também cobre cv2.VideoCapture do backend OBS)
 opencv-python>=4.10.0
 numpy>=2.1.0
+
+# Opcional: descobrir a OBS Virtual Camera por nome (backend: obs). Sem isso,
+# usa-se captura.obs_device_index.
+pygrabber>=0.2 ; sys_platform == "win32"
 
 # Simulação de input (SendInput; funciona em jogos DirectX onde pyautogui falha)
 pydirectinput-rgx>=2.1.0

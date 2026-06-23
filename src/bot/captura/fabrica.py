@@ -27,8 +27,27 @@ def criar_capturador(
     tibia_screenshots: str = "",
     hotkey_screenshot: str = "ctrl+p",
     fps_alvo: float = 3.0,
+    obs_device_index: int = 0,
+    obs_device_nome: str = "OBS Virtual Camera",
 ) -> CapturadorBase:
     emitir = log or (lambda _msg: None)
+
+    if backend == "obs":
+        try:
+            from bot.captura.obs_virtualcam import CapturadorOBS
+
+            cap = CapturadorOBS(indice=obs_device_index, nome_device=obs_device_nome)
+            cap.iniciar()
+            emitir(
+                f"Captura: backend OBS Virtual Camera ativo (device índice {cap._indice}) "
+                "— frame do canvas do OBS"
+            )
+            return cap
+        except Exception as e:
+            raise RuntimeError(
+                f"Backend obs falhou: {e}. Abra o OBS, monte uma cena com captura do "
+                "Tibia e clique em 'Start Virtual Camera'."
+            ) from e
 
     if backend in ("auto", "bettercam"):
         try:
@@ -79,5 +98,5 @@ def criar_capturador(
             raise RuntimeError(f"Backend tibia_arquivo falhou: {e}") from e
 
     raise RuntimeError(
-        f"Backend '{backend}' desconhecido. Use: auto | bettercam | wgc | mss | tibia_arquivo"
+        f"Backend '{backend}' desconhecido. Use: auto | bettercam | wgc | mss | obs | tibia_arquivo"
     )

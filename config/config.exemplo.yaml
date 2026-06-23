@@ -2,13 +2,16 @@
 # As regiões (hp/mana) são preenchidas pela calibração; não edite à mão.
 
 captura:
-  backend: auto        # auto | bettercam | wgc | mss | tibia_arquivo
-                       #   auto:          tenta DXGI -> WGC -> mss (automático)
+  backend: obs         # auto | bettercam | wgc | mss | obs | tibia_arquivo
+                       #   obs:           RECOMENDADO p/ Tibia oficial (veja abaixo)
+                       #   auto:          tenta DXGI -> WGC -> mss (use em OT Server / sem BattlEye)
                        #   wgc:           Windows Graphics Capture — pega DX12/OpenGL no Python 3.13
                        #   mss:           GDI puro — NÃO captura DX12 (vem preto)
+                       #   obs:           lê a OBS Virtual Camera (OBS é whitelisted pelo BattlEye)
+                       #                 → MELHOR opção p/ Tibia oficial com WDA_EXCLUDEFROMCAPTURE
+                       #                 (frame ao vivo ~30-60 FPS; exige OBS aberto + Virtual Camera)
                        #   tibia_arquivo: usa a hotkey de screenshot DO TIBIA e lê o arquivo PNG
-                       #                 → obrigatório se o Tibia bloquear toda captura externa
-                       #                 (PrintScreen e mss vêm pretos = WDA_EXCLUDEFROMCAPTURE ativo)
+                       #                 → fallback lento (~3 FPS) se não quiser usar o OBS
   monitor: 0           # índice do monitor (0 = primário)
   fps_alvo: 15         # ticks por segundo do loop do bot (use 3-5 com tibia_arquivo)
 
@@ -17,7 +20,15 @@ captura:
                                # ex.: C:\Users\joao\AppData\Roaming\Tibia\packages\Tibia\screenshots
   hotkey_screenshot: ctrl+p  # hotkey configurada em Options > Interface > Screenshot do Tibia
 
+  # --- campos usados SOMENTE com backend: obs ---
+  obs_device_index: 0                  # índice da webcam virtual (usado se o nome não casar)
+  obs_device_nome: OBS Virtual Camera  # casado por nome se a lib pygrabber estiver instalada
+  mapeamento_obs:                      # converte coords do canvas do OBS p/ a tela (clique de alvo)
+    box: null                          # área do jogo no canvas [l,t,r,b]; null = canvas inteiro (1:1)
+                                       # preenchido/validado por calibrar.py
+
 regioes:               # [left, top, right, bottom] em pixels absolutos do desktop
+                       # (com backend: obs, ficam em coords do canvas do OBS)
   hp: [0, 0, 0, 0]            # preenchido por calibrar.py
   mana: [0, 0, 0, 0]         # preenchido por calibrar.py
   battle_list: [0, 0, 0, 0]  # opcional; preenchido por calibrar.py -> habilita targeting

@@ -79,15 +79,43 @@ def _salvar_e_diagnosticar(img) -> bool:
     return True
 
 
+def _capturar_via_obs(indice: int, nome_device: str) -> np.ndarray | None:
+    """Captura um frame do canvas via OBS Virtual Camera (whitelisted pelo BattlEye)."""
+    try:
+        from bot.captura.obs_virtualcam import CapturadorOBS
+
+        cap = CapturadorOBS(indice=indice, nome_device=nome_device)
+        cap.iniciar()
+        frame = cap.capturar(None)
+        cap.parar()
+        if frame is None:
+            print("[cap] OBS: nenhum frame recebido.")
+            return None
+        img = frame.imagem
+        media = float(img.mean())
+        print(f"[cap] OBS: {img.shape[1]}x{img.shape[0]}  média={media:.1f}  max={float(img.max()):.0f}")
+        if media > 15:
+            return img
+        print("[cap] OBS: frame quase preto — a cena do OBS está mostrando o Tibia?")
+    except Exception as e:
+        print(f"[cap] OBS falhou: {e}")
+        print("       Abra o OBS, monte a cena do Tibia e clique em 'Start Virtual Camera'.")
+    return None
+
+
 def _capturar_screenshot(
     monitor_idx: int = 0,
     hotkey_screenshot: str = "ctrl+p",
     pasta_screenshots: str = "",
+    backend: str = "auto",
+    obs_device_index: int = 0,
+    obs_device_nome: str = "OBS Virtual Camera",
 ) -> np.ndarray | None:
     """Tenta capturar a tela por vários métodos em ordem crescente de complexidade.
 
-    mss/PIL/WGC funcionam quando o Tibia NÃO usa WDA_EXCLUDEFROMCAPTURE.
-    tibia_arquivo é o fallback para quando o Tibia bloqueia toda captura externa.
+    Com backend=obs, captura primeiro pela OBS Virtual Camera (única saída para o
+    Tibia oficial com WDA_EXCLUDEFROMCAPTURE). mss/PIL/WGC funcionam quando o Tibia
+    NÃO usa WDA; tibia_arquivo é o fallback por hotkey de screenshot.
     """
     def _util(arr: np.ndarray, nome: str) -> np.ndarray | None:
         """Retorna arr se a média indicar conteúdo real de jogo (> 15); loga e retorna None senão."""
@@ -97,6 +125,13 @@ def _capturar_screenshot(
             return arr
         print(f"[cap] {nome}: média muito baixa — jogo bloqueado (WDA_EXCLUDEFROMCAPTURE?) — próximo método…")
         return None
+
+    # 0. OBS Virtual Camera (preferido com backend=obs)
+    if backend == "obs":
+        resultado = _capturar_via_obs(obs_device_index, obs_device_nome)
+        if resultado is not None:
+            return resultado
+        print("[cap] OBS não retornou imagem útil — tentando métodos diretos…")
 
     # 1. mss (GDI via DWM)
     try:
@@ -273,6 +308,35 @@ def _capturar_via_tibia_arquivo(hotkey: str, pasta_str: str) -> np.ndarray | Non
     return None
 
 
+def _configurar_mapeamento_obs_na_calibracao(cfg, img: np.ndarray) -> None:
+    """Define o mapeamento canvas->desktop e valida o client rect vivo do Tibia.
+
+    No setup recomendado (canvas do OBS 1:1 com a área cliente do Tibia), box=None
+    (canvas inteiro) já basta — o clique é só um offset para a posição da janela.
+    """
+    from bot.captura.mapeamento import obter_client_rect
+
+    cfg.captura.mapeamento_obs.box = None  # canvas inteiro (setup 1:1)
+    h, w = img.shape[:2]
+    rect = obter_client_rect(cfg.seguranca.titulo_janela_contains)
+    if rect is None:
+        print(
+            "\n[mapa] AVISO: não achei a janela do Tibia para ler a posição na tela.\n"
+            "       O clique de targeting precisa disso. Deixe o Tibia em janela e visível.\n"
+        )
+        return
+    cw, ch = rect[2] - rect[0], rect[3] - rect[1]
+    print(f"\n[mapa] Canvas do OBS: {w}x{h}  |  janela cliente do Tibia: {cw}x{ch} em {rect[:2]}")
+    if abs(cw - w) > 4 or abs(ch - h) > 4:
+        print(
+            "[mapa] OBS: o canvas NÃO bate 1:1 com a janela do Tibia (haverá escala).\n"
+            "       Recomendado: deixe a fonte preenchendo o canvas no tamanho da janela\n"
+            "       para o clique ficar exato. Mesmo assim o mapeamento por escala é aplicado."
+        )
+    else:
+        print("[mapa] OBS: canvas 1:1 com a janela — clique de targeting será preciso.")
+
+
 def main() -> int:
     print("=== Calibração do Bot Tibia ===")
     print("1) Abra o Tibia em MODO JANELA (Full Screen OFF) e deixe as barras visíveis.")
@@ -283,10 +347,16 @@ def main() -> int:
     # o terminal está na frente agora; traz o Tibia pra frente e dá tempo de aparecer
     _aguardar_jogo_na_frente(cfg.seguranca.titulo_janela_contains)
 
+    if cfg.captura.backend == "obs":
+        print(">>> Backend OBS: confirme que a OBS Virtual Camera está INICIADA e a cena mostra o Tibia.")
+
     img = _capturar_screenshot(
         cfg.captura.monitor,
         hotkey_screenshot=cfg.captura.hotkey_screenshot,
         pasta_screenshots=cfg.captura.tibia_screenshots,
+        backend=cfg.captura.backend,
+        obs_device_index=cfg.captura.obs_device_index,
+        obs_device_nome=cfg.captura.obs_device_nome,
     )
     if img is None:
         print("\n*** Todos os métodos retornaram preto. ***")
@@ -324,6 +394,9 @@ def main() -> int:
         )
     else:
         print("Battle list não marcada — targeting fica desligado.")
+
+    if cfg.captura.backend == "obs":
+        _configurar_mapeamento_obs_na_calibracao(cfg, img)
 
     salvar_config(cfg)
 

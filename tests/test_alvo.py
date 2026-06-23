@@ -17,7 +17,7 @@ def _ctx(criaturas=None, hp=None):
     ctx = Contexto(config=cfg)
     ctx.criaturas = criaturas
     if hp is not None:
-        ctx.hp = LeituraBarra(hp, 64, 0, 1.0)
+        ctx.hp = LeituraBarra(hp, 1.0)
     return ctx, cfg
 
 

@@ -50,6 +50,8 @@ def main() -> int:
         tibia_screenshots=cfg.captura.tibia_screenshots,
         hotkey_screenshot=cfg.captura.hotkey_screenshot,
         fps_alvo=cfg.captura.fps_alvo,
+        obs_device_index=cfg.captura.obs_device_index,
+        obs_device_nome=cfg.captura.obs_device_nome,
     )
     entrada = EntradaDirectInput(cfg.entrada.atraso_pre_ms, cfg.entrada.atraso_pos_ms)
     cooldown = GerenciadorCooldown({**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s})

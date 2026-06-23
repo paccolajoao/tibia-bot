@@ -15,9 +15,9 @@ def _ctx(hp=None, mana=None, confianca=1.0):
     cfg = Config()
     ctx = Contexto(config=cfg)
     if hp is not None:
-        ctx.hp = LeituraBarra(hp, 64, 0, confianca)
+        ctx.hp = LeituraBarra(hp, confianca)
     if mana is not None:
-        ctx.mana = LeituraBarra(mana, 64, 0, confianca)
+        ctx.mana = LeituraBarra(mana, confianca)
     return ctx, cfg
 
 

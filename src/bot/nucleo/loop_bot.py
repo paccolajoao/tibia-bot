@@ -109,6 +109,48 @@ class LoopBot(threading.Thread):
         # detecção de frames pretos (backend WGC retornando preto para DX11 Blt-model)
         self._ticks_sem_confianca = 0
         self._fallback_mss_feito = False
+        # backend OBS: regiões/clique ficam em coords de canvas -> mapear p/ desktop
+        self._backend_nome = getattr(capturador, "nome_backend", cfg.captura.backend)
+        self._transformar_clique = None
+        self._client_rect_cache = None
+        self._client_rect_ts = 0.0
+        if self._backend_nome == "obs":
+            self._configurar_mapeamento_obs(cfg)
+
+    # -------------------------------------------------- mapeamento OBS->desktop
+    def _configurar_mapeamento_obs(self, cfg) -> None:
+        """Monta o callable que converte coords de canvas (OBS) em coords de desktop.
+
+        Lê o canvas inteiro uma vez para saber suas dimensões (necessário quando
+        box=None) e o título da janela do Tibia para achar o client rect ao vivo.
+        """
+        from bot.captura.mapeamento import mapear_canvas_para_desktop, obter_client_rect
+
+        box = tuple(cfg.captura.mapeamento_obs.box) if cfg.captura.mapeamento_obs.box else None
+        titulo = cfg.seguranca.titulo_janela_contains
+        frame = self.cap.capturar(None)
+        canvas_wh = None
+        if frame is not None:
+            h, w = frame.imagem.shape[:2]
+            canvas_wh = (w, h)
+
+        def _client_rect_vivo():
+            agora = time.perf_counter()
+            if self._client_rect_cache is not None and agora - self._client_rect_ts < 1.0:
+                return self._client_rect_cache
+            rect = obter_client_rect(titulo)
+            if rect is not None:
+                self._client_rect_cache = rect
+                self._client_rect_ts = agora
+            return rect or self._client_rect_cache
+
+        def _transformar(x, y):
+            rect = _client_rect_vivo()
+            if rect is None:
+                return (x, y)  # sem janela: melhor não deslocar do que chutar
+            return mapear_canvas_para_desktop(x, y, rect, box, canvas_wh)
+
+        self._transformar_clique = _transformar
 
     # ------------------------------------------------------------------ loop
     def run(self) -> None:
@@ -215,7 +257,10 @@ class LoopBot(threading.Thread):
         if det.centro_primeira is not None:
             left, top, _, _ = self._reg_battle
             cx, cy = det.centro_primeira
-            det.ponto_clique = (left + cx, top + cy)
+            px, py = left + cx, top + cy
+            if self._transformar_clique is not None:
+                px, py = self._transformar_clique(px, py)
+            det.ponto_clique = (px, py)
         return det
 
     def _rastrear_mortes(self, det: DeteccaoCriaturas | None, ts: float) -> None:
@@ -248,6 +293,21 @@ class LoopBot(threading.Thread):
             return
 
         if self._ticks_sem_confianca != 30 or self._fallback_mss_feito:
+            return
+
+        # Com OBS, frame preto = Virtual Camera parada ou cena sem o Tibia. Trocar
+        # para mss não ajuda (mss vem preto no Tibia oficial) — só avisa.
+        if self._backend_nome == "obs":
+            self._fallback_mss_feito = True  # avisa uma vez só
+            self.bus.publicar(
+                ev.LinhaRaciocinio(
+                    ts,
+                    self.ctx.tick,
+                    "AVISO: 30 ticks sem dados com backend OBS. Confira se a Virtual "
+                    "Camera está iniciada no OBS e se a cena mostra o Tibia.",
+                    "alerta",
+                )
+            )
             return
 
         backend_atual = getattr(self.cap, "nome_backend", "?")

@@ -32,8 +32,6 @@ class LeituraBarra:
     """
 
     percentual: float  # 0.0 .. 100.0
-    amostras_total: int
-    amostras_preenchidas: int
     confianca: float  # 0.0 .. 1.0
 
     def __str__(self) -> str:

@@ -20,13 +20,28 @@ CAMINHO_CONFIG = RAIZ_PROJETO / "config" / "config.yaml"
 CAMINHO_CONFIG_EXEMPLO = RAIZ_PROJETO / "config" / "config.exemplo.yaml"
 
 
+class MapeamentoObsConfig(BaseModel):
+    """Mapeamento canvas (OBS) -> desktop para o clique de targeting.
+
+    box = área do jogo dentro do canvas em coords de canvas [l,t,r,b]; null = canvas
+    inteiro (setup recomendado 1:1). O retângulo cliente da janela do Tibia é lido
+    ao vivo em runtime, então mover a janela não exige recalibrar.
+    """
+
+    box: Regiao | None = None
+
+
 class CapturaConfig(BaseModel):
-    backend: str = "auto"  # auto | bettercam | wgc | mss | tibia_arquivo
+    backend: str = "auto"  # auto | bettercam | wgc | mss | obs | tibia_arquivo
     monitor: int = 0
     fps_alvo: float = 15.0
     # campos usados apenas com backend=tibia_arquivo
     tibia_screenshots: str = ""       # pasta de screenshots do Tibia (vazio = auto-detecta)
     hotkey_screenshot: str = "ctrl+p"  # hotkey configurada em Options > Interface do Tibia
+    # campos usados apenas com backend=obs (OBS Virtual Camera)
+    obs_device_index: int = 0          # índice da webcam virtual (fallback se nome não casar)
+    obs_device_nome: str = "OBS Virtual Camera"  # casado por nome se pygrabber instalado
+    mapeamento_obs: MapeamentoObsConfig = Field(default_factory=MapeamentoObsConfig)
 
 
 class RegioesConfig(BaseModel):
