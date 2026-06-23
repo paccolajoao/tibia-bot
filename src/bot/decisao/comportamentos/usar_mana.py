@@ -32,6 +32,13 @@ class UsarMana:
         if mana is None or mana.confianca < self.cfg.confianca_minima:
             return None
 
+        # Treino de ML é tarefa de OCIOSO: cede a vez ao combate. Se há criaturas na
+        # battle list, não gasta o tick treinando mana (evita travar ataque/saque mesmo
+        # que a prioridade esteja alta). Sem battle list calibrada, `criaturas` é None.
+        criaturas = contexto.criaturas
+        if criaturas is not None and criaturas.n_criaturas > 0:
+            return None
+
         limiar = self.cfg.mana_alto if self.cfg.mana_alto < 100.0 else LIMIAR_CHEIO_INATINGIVEL
         pct = mana.percentual
         if pct >= limiar:

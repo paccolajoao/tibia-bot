@@ -42,10 +42,23 @@ def test_clica_quando_criatura_sem_alvo():
     assert dec.chave_cd == "atacar"
 
 
-def test_nao_clica_quando_ja_ha_alvo():
-    ctx, cfg = _ctx(criaturas=_det(alvo_atual=True))
+def test_alvo_atual_nao_bloqueia_ataque():
+    # `alvo_atual` (realce vermelho) é leitura não-confiável (confunde com HP avermelhado):
+    # NÃO deve impedir o ataque. Sem engajamento prévio, ataca mesmo com alvo_atual=True.
+    ctx, cfg = _ctx(criaturas=_det(n=2, alvo_atual=True))
     dec = _alvo(cfg).decidir(ctx, 0.0)
-    assert dec.acao == TipoAcao.NENHUMA
+    assert dec.acao == TipoAcao.CLICAR
+
+
+def test_reataca_proximo_apos_morte_mesmo_com_alvo_atual():
+    # Regressão: mata 1 de vários e os restantes (feridos -> barra avermelhada) fariam
+    # alvo_atual=True. A morte (queda na contagem) deve destravar o re-ataque mesmo assim.
+    ctx, cfg = _ctx(criaturas=_det(n=2, alvo_atual=True))
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 0.0
+    ctx.estado_comportamentos["saque_morte_ts"] = 0.5
+    ctx.ts = 0.6
+    dec = _alvo(cfg).decidir(ctx, 0.6)
+    assert dec.acao == TipoAcao.CLICAR
 
 
 def test_nao_clica_sem_criaturas():

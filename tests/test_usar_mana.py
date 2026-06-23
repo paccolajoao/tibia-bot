@@ -6,7 +6,7 @@ from bot.configuracao import Config
 from bot.contexto import Contexto
 from bot.decisao.comportamentos.usar_mana import UsarMana
 from bot.decisao.tipos import TipoAcao
-from bot.visao.tipos import LeituraBarra
+from bot.visao.tipos import DeteccaoCriaturas, LeituraBarra
 
 
 def _ctx(mana_pct: float, conf: float = 1.0):
@@ -56,3 +56,14 @@ def test_abaixo_do_limiar_nao_casta():
 def test_confianca_baixa_ignora():
     ctx, cfg = _ctx(mana_pct=99.0, conf=0.3)  # abaixo de confianca_minima (0.6)
     assert UsarMana(cfg.usar_mana).avaliar(ctx) is None
+
+
+def test_cede_a_vez_ao_combate():
+    # treino de ML é p/ ocioso: com criaturas na battle list, não casta (mesmo com mana cheia),
+    # p/ não travar ataque/saque ainda que a prioridade esteja alta.
+    ctx, cfg = _ctx(mana_pct=99.0)
+    ctx.criaturas = DeteccaoCriaturas(2, False, 1.0, (10, 5))
+    assert UsarMana(cfg.usar_mana).avaliar(ctx) is None
+
+    ctx.criaturas = DeteccaoCriaturas(0, False, 1.0, None)  # sem criaturas -> treina
+    assert UsarMana(cfg.usar_mana).avaliar(ctx) is not None
