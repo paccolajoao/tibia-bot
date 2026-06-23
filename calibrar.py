@@ -79,12 +79,14 @@ def _salvar_e_diagnosticar(img) -> bool:
     return True
 
 
-def _capturar_via_obs(indice: int, nome_device: str) -> np.ndarray | None:
+def _capturar_via_obs(
+    indice: int, nome_device: str, largura: int = 1920, altura: int = 1080
+) -> np.ndarray | None:
     """Captura um frame do canvas via OBS Virtual Camera (whitelisted pelo BattlEye)."""
     try:
         from bot.captura.obs_virtualcam import CapturadorOBS
 
-        cap = CapturadorOBS(indice=indice, nome_device=nome_device)
+        cap = CapturadorOBS(indice=indice, nome_device=nome_device, largura=largura, altura=altura)
         cap.iniciar()
         frame = cap.capturar(None)
         cap.parar()
@@ -110,6 +112,8 @@ def _capturar_screenshot(
     backend: str = "auto",
     obs_device_index: int = 0,
     obs_device_nome: str = "OBS Virtual Camera",
+    obs_largura: int = 1920,
+    obs_altura: int = 1080,
 ) -> np.ndarray | None:
     """Tenta capturar a tela por vários métodos em ordem crescente de complexidade.
 
@@ -128,7 +132,7 @@ def _capturar_screenshot(
 
     # 0. OBS Virtual Camera (preferido com backend=obs)
     if backend == "obs":
-        resultado = _capturar_via_obs(obs_device_index, obs_device_nome)
+        resultado = _capturar_via_obs(obs_device_index, obs_device_nome, obs_largura, obs_altura)
         if resultado is not None:
             return resultado
         print("[cap] OBS não retornou imagem útil — tentando métodos diretos…")
@@ -357,6 +361,8 @@ def main() -> int:
         backend=cfg.captura.backend,
         obs_device_index=cfg.captura.obs_device_index,
         obs_device_nome=cfg.captura.obs_device_nome,
+        obs_largura=cfg.captura.obs_largura,
+        obs_altura=cfg.captura.obs_altura,
     )
     if img is None:
         print("\n*** Todos os métodos retornaram preto. ***")

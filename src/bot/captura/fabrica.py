@@ -29,6 +29,8 @@ def criar_capturador(
     fps_alvo: float = 3.0,
     obs_device_index: int = 0,
     obs_device_nome: str = "OBS Virtual Camera",
+    obs_largura: int = 1920,
+    obs_altura: int = 1080,
 ) -> CapturadorBase:
     emitir = log or (lambda _msg: None)
 
@@ -36,10 +38,17 @@ def criar_capturador(
         try:
             from bot.captura.obs_virtualcam import CapturadorOBS
 
-            cap = CapturadorOBS(indice=obs_device_index, nome_device=obs_device_nome)
+            cap = CapturadorOBS(
+                indice=obs_device_index,
+                nome_device=obs_device_nome,
+                largura=obs_largura,
+                altura=obs_altura,
+            )
             cap.iniciar()
+            frame = cap.capturar(None)
+            dims = f"{frame.imagem.shape[1]}x{frame.imagem.shape[0]}" if frame else "?"
             emitir(
-                f"Captura: backend OBS Virtual Camera ativo (device índice {cap._indice}) "
+                f"Captura: backend OBS Virtual Camera ativo (device índice {cap._indice}, {dims}) "
                 "— frame do canvas do OBS"
             )
             return cap

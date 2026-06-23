@@ -109,6 +109,8 @@ class LoopBot(threading.Thread):
         # detecção de frames pretos (backend WGC retornando preto para DX11 Blt-model)
         self._ticks_sem_confianca = 0
         self._fallback_mss_feito = False
+        # foco da janela do Tibia: gateia o INPUT (não a leitura). None = ainda não avaliado
+        self._ultimo_foco: bool | None = None
         # backend OBS: regiões/clique ficam em coords de canvas -> mapear p/ desktop
         self._backend_nome = getattr(capturador, "nome_backend", cfg.captura.backend)
         self._transformar_clique = None
@@ -175,14 +177,19 @@ class LoopBot(threading.Thread):
             t0 = time.perf_counter()
             self.ctx.ts = t0
 
+            # Foco gateia só o INPUT, não a leitura: a captura via OBS funciona sem foco,
+            # então seguimos lendo/publicando as barras; o SendInput (que só chega na janela
+            # em foco) é suspenso quando o Tibia não está à frente. Sem auto-pause — assim o
+            # painel mostra HP/Mana/criaturas ao vivo e o Pausar/Retomar manual não é revertido.
             self.ctx.janela_focada = self.seg.janela_focada()
-            if not self.ctx.janela_focada:
-                self.bus.publicar(
-                    ev.LinhaRaciocinio(t0, self.ctx.tick, "Janela do Tibia sem foco -> auto-pause", "alerta")
+            if self.ctx.janela_focada != self._ultimo_foco:
+                self._ultimo_foco = self.ctx.janela_focada
+                msg = (
+                    "Janela do Tibia em foco — input ativo"
+                    if self.ctx.janela_focada
+                    else "Janela do Tibia sem foco — leitura ativa, input suspenso (foque o Tibia p/ agir)"
                 )
-                self.ctrl.definir(EstadoExecucao.PAUSADO)
-                self._publicar_estado()
-                continue
+                self.bus.publicar(ev.LinhaRaciocinio(t0, self.ctx.tick, msg, "info"))
 
             frame = self.cap.capturar(self._regiao_combinada)
             if frame is None:
@@ -205,7 +212,9 @@ class LoopBot(threading.Thread):
 
             dec = self.motor.decidir(self.ctx, t0)
             executou = False
-            if dec.acao == TipoAcao.PRESSIONAR_TECLA and dec.tecla:
+            if not self.ctx.janela_focada:
+                pass  # sem foco: decide e exibe, mas não envia input (SendInput exige foco)
+            elif dec.acao == TipoAcao.PRESSIONAR_TECLA and dec.tecla:
                 self.entrada.pressionar_tecla(dec.tecla)
                 executou = True
             elif dec.acao == TipoAcao.CLICAR and dec.ponto:
@@ -214,6 +223,9 @@ class LoopBot(threading.Thread):
             if executou:
                 self.motor.confirmar_acao(dec, t0)
                 self.ctx.estatisticas.registrar_acao(dec)
+                if dec.dados.get("recurso") == "alvo":
+                    # marca o engajamento: o Alvo não troca de bicho até morte/timeout
+                    self.ctx.estado_comportamentos["alvo_engajado_ts"] = t0
 
             self._publicar_decisao(dec)
             self._publicar_deteccao()

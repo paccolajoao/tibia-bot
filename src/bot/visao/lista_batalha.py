@@ -90,9 +90,10 @@ def _tem_realce_vermelho(h: np.ndarray, saturado: np.ndarray, realce_min_frac: f
 
 
 def _confianca(cobertura: float) -> float:
-    """Cobertura saturada implausivelmente alta (tooltip/overlay sobre a lista)
-    derruba a confiança — o comportamento então ignora a leitura.
+    """Só cobertura saturada QUASE total (tooltip/overlay colorido cobrindo a lista)
+    derruba a confiança. Uma battle list cheia de criaturas satura bastante de forma
+    legítima, então o limiar é alto (0.85) p/ não descartar listas com vários bichos.
     """
-    if cobertura <= 0.6:
+    if cobertura <= 0.85:
         return 1.0
-    return max(0.0, 1.0 - (cobertura - 0.6) * 2.5)
+    return max(0.0, 1.0 - (cobertura - 0.85) * 3.0)

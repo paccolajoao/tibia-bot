@@ -52,6 +52,8 @@ def main() -> int:
         fps_alvo=cfg.captura.fps_alvo,
         obs_device_index=cfg.captura.obs_device_index,
         obs_device_nome=cfg.captura.obs_device_nome,
+        obs_largura=cfg.captura.obs_largura,
+        obs_altura=cfg.captura.obs_altura,
     )
     entrada = EntradaDirectInput(cfg.entrada.atraso_pre_ms, cfg.entrada.atraso_pos_ms)
     cooldown = GerenciadorCooldown({**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s})

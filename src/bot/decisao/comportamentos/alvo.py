@@ -26,6 +26,7 @@ class Alvo:
         self.confianca_minima = (
             confianca_minima if confianca_minima is not None else alvo.confianca_minima
         )
+        self.recompromisso_s = alvo.recompromisso_s
 
     def avaliar(self, contexto: Contexto) -> Decisao | None:
         c = contexto.criaturas
@@ -33,10 +34,22 @@ class Alvo:
             return None
         if c.n_criaturas <= 0:
             return None
-        if c.alvo_atual:
-            return None  # já lutando: deixa o alvo atual
         if c.ponto_clique is None:
             return None
+        if c.alvo_atual:
+            return None  # o client mostra alvo ativo (realce vermelho): não troca
+
+        # Um clique já fixa o alvo no Tibia e o char auto-ataca até a morte. Então,
+        # depois de engajar, NÃO re-clicamos (evita ficar trocando de bicho): só
+        # voltamos a atacar quando uma criatura morre (precisa de novo alvo) ou após
+        # `recompromisso_s` — rede de segurança caso o clique não tenha pego o alvo.
+        estado = contexto.estado_comportamentos
+        engajado_ts = estado.get("alvo_engajado_ts")
+        if engajado_ts is not None:
+            morte_ts = estado.get("saque_morte_ts", 0.0)
+            matou_desde = morte_ts > engajado_ts
+            if not matou_desde and (contexto.ts - engajado_ts) < self.recompromisso_s:
+                return None  # ainda engajado: deixa o alvo atual ser morto
 
         return Decisao(
             self.nome,

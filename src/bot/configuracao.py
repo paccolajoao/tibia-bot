@@ -41,6 +41,8 @@ class CapturaConfig(BaseModel):
     # campos usados apenas com backend=obs (OBS Virtual Camera)
     obs_device_index: int = 0          # índice da webcam virtual (fallback se nome não casar)
     obs_device_nome: str = "OBS Virtual Camera"  # casado por nome se pygrabber instalado
+    obs_largura: int = 1920            # resolução pedida ao device (DShow abre 640x480 por padrão)
+    obs_altura: int = 1080
     mapeamento_obs: MapeamentoObsConfig = Field(default_factory=MapeamentoObsConfig)
 
 
@@ -90,6 +92,9 @@ class AlvoConfig(BaseModel):
     confianca_minima: float = 0.6
     s_min: int = 60  # saturação mínima do mini HP-bar da criatura na battle list
     v_min: int = 60  # brilho mínimo
+    # após atacar, NÃO troca de alvo por este tempo (deixa o auto-attack do Tibia matar).
+    # Re-ataca antes disso só se uma criatura morrer; o timeout é a rede p/ clique perdido.
+    recompromisso_s: float = 3.0
     cooldown_s: dict[str, float] = Field(default_factory=lambda: {"atacar": 2.0})
 
 

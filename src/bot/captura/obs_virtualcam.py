@@ -56,10 +56,14 @@ class CapturadorOBS:
         self,
         indice: int = 0,
         nome_device: str = "OBS Virtual Camera",
+        largura: int = 1920,
+        altura: int = 1080,
         timeout_primeiro_frame_s: float = 5.0,
     ):
         self._indice = indice
         self._nome_device = nome_device
+        self._largura = largura
+        self._altura = altura
         self._timeout = timeout_primeiro_frame_s
         self._lock = threading.Lock()
         self._ultimo: np.ndarray | None = None
@@ -82,6 +86,11 @@ class CapturadorOBS:
                 "Abra o OBS e clique em 'Start Virtual Camera'."
             )
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        # DirectShow abre em 640x480 por padrão — sem isto a calibração fica borrada.
+        # Pedimos a resolução desejada; o device entrega o tamanho suportado mais próximo.
+        if self._largura and self._altura:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._largura)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._altura)
         self._cap = cap
         self._rodando = True
         self._thread = threading.Thread(target=self._loop_leitura, name="OBSReader", daemon=True)

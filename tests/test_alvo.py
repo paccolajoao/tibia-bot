@@ -81,6 +81,34 @@ def test_cooldown_suprime_cliques_repetidos():
     assert d3.acao == TipoAcao.CLICAR
 
 
+def test_nao_retroca_alvo_enquanto_engajado():
+    # já atacamos um alvo (engajado em t=0); dentro de recompromisso_s e sem kill -> não re-ataca
+    ctx, cfg = _ctx(criaturas=_det(n=2, alvo_atual=False))
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 0.0
+    ctx.ts = 1.0
+    dec = _alvo(cfg).decidir(ctx, 1.0)
+    assert dec.acao == TipoAcao.NENHUMA
+
+
+def test_reataca_apos_criatura_morrer():
+    # engajado em t=0; uma criatura morreu em t=0.5 -> precisa de novo alvo -> ataca
+    ctx, cfg = _ctx(criaturas=_det(n=2, alvo_atual=False))
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 0.0
+    ctx.estado_comportamentos["saque_morte_ts"] = 0.5
+    ctx.ts = 1.0
+    dec = _alvo(cfg).decidir(ctx, 1.0)
+    assert dec.acao == TipoAcao.CLICAR
+
+
+def test_reataca_apos_timeout_de_recompromisso():
+    # engajado em t=0, sem kill; passou de recompromisso_s (3s) -> rede de segurança ataca
+    ctx, cfg = _ctx(criaturas=_det(n=1, alvo_atual=False))
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 0.0
+    ctx.ts = 5.0
+    dec = _alvo(cfg).decidir(ctx, 5.0)
+    assert dec.acao == TipoAcao.CLICAR
+
+
 def test_auto_cura_preempta_alvo_no_mesmo_tick():
     # HP crítico + criatura presente: curar (prioridade 100) vence atacar (80)
     ctx, cfg = _ctx(criaturas=_det(), hp=20)

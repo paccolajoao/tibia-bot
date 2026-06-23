@@ -23,6 +23,8 @@ captura:
   # --- campos usados SOMENTE com backend: obs ---
   obs_device_index: 0                  # índice da webcam virtual (usado se o nome não casar)
   obs_device_nome: OBS Virtual Camera  # casado por nome se a lib pygrabber estiver instalada
+  obs_largura: 1920                    # resolução pedida ao device (DShow abre 640x480 por padrão!)
+  obs_altura: 1080                     # deixe igual à resolução de saída do OBS (Settings > Video)
   mapeamento_obs:                      # converte coords do canvas do OBS p/ a tela (clique de alvo)
     box: null                          # área do jogo no canvas [l,t,r,b]; null = canvas inteiro (1:1)
                                        # preenchido/validado por calibrar.py
@@ -59,6 +61,8 @@ alvo:                     # targeting — só ativa se regioes.battle_list estiv
   confianca_minima: 0.6
   s_min: 60               # saturação mín. do mini HP-bar da criatura na battle list
   v_min: 60               # brilho mín.
+  recompromisso_s: 3.0    # após atacar, não troca de alvo por N s (deixa o Tibia matar);
+                          # re-ataca antes disso só se uma criatura morrer
   cooldown_s:
     atacar: 2.0           # intervalo mínimo entre cliques de ataque
 

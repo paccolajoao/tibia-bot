@@ -242,6 +242,9 @@ o fallback lento `tibia_arquivo` (~3 FPS via hotkey de screenshot).
 - Opcional, mas recomendado: `pip install pygrabber` — assim o bot acha a câmera pelo nome
   (`obs_device_nome: OBS Virtual Camera`). Sem o pygrabber, ajuste `obs_device_index` (0, 1, 2…)
   até cair na câmera virtual (se tiver webcam física, o índice da virtual costuma ser o maior).
+- **Resolução:** o DirectShow abre a câmera em **640x480** por padrão (fica borrado na
+  calibração). O bot pede `obs_largura`/`obs_altura` (padrão **1920x1080**) — deixe esses valores
+  **iguais à resolução de saída do OBS** (passo 3, *Output Resolution*) para o frame ficar nítido.
 
 **8. Calibrar e rodar**
 - `python calibrar.py` — agora o frame **não vem preto**; marque HP, mana e battle list. A
