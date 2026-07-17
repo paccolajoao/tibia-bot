@@ -8,7 +8,9 @@ saturado. A heurística aqui:
   - acha linhas onde um trecho horizontal saturado largo o bastante existe (o bar);
   - agrupa linhas-bar consecutivas em ENTRADAS -> conta criaturas;
   - detecta `alvo_atual` pela presença de realce VERMELHO (a entrada atacada ganha
-    moldura/realce vermelho no client).
+    moldura/realce vermelho no client);
+  - mede o preenchimento (%) do mini HP-bar só da 1ª entrada (`vida_primeira`) —
+    usado pelo watchdog "sem dano" do Alvo, não faz tracking das demais criaturas.
 
 É um primeiro slice — robusto o bastante para ligar/atacar, upgradeável a template
 matching depois. Função pura `(np.ndarray, regiao, ...) -> DeteccaoCriaturas`.
@@ -20,7 +22,8 @@ import cv2
 import numpy as np
 
 from bot.captura.base import Regiao
-from bot.visao.tipos import DeteccaoCriaturas
+from bot.visao.barra_recursos import _percentual_de_mascara
+from bot.visao.tipos import DeteccaoCriaturas, LeituraBarra
 
 
 def detectar_criaturas(
@@ -55,7 +58,8 @@ def detectar_criaturas(
         for y0, y1 in grupos
     )
     confianca = _confianca(float(saturado.mean()))
-    return DeteccaoCriaturas(n, alvo, confianca, centro)
+    vida_primeira = _vida_primeira(saturado, grupos)
+    return DeteccaoCriaturas(n, alvo, confianca, centro, vida_primeira=vida_primeira)
 
 
 def _agrupar_runs(mascara: np.ndarray) -> list[tuple[int, int]]:
@@ -85,6 +89,21 @@ def _centro_primeira(
     cx = int((xs[0] + xs[-1]) // 2) if xs.size else largura // 2
     cy = (y0 + y1) // 2
     return (cx, cy)
+
+
+def _vida_primeira(saturado: np.ndarray, grupos: list[tuple[int, int]]) -> LeituraBarra | None:
+    """Preenchimento (%) do mini HP-bar da 1ª criatura (grupos[0]).
+
+    Reaproveita o mesmo classificador por coluna das barras de HP/Mana principais
+    (`barra_recursos._percentual_de_mascara`) sobre a fatia de linhas do 1º grupo —
+    evita reconverter BGR->HSV, já que `saturado` é a máscara da ROI inteira.
+    `invertido=False`: a vida da criatura esvazia da direita p/ esquerda, igual à
+    vida do personagem (mesma convenção de `VisaoConfig.hp.invertido=False`).
+    """
+    if not grupos:
+        return None
+    y0, y1 = grupos[0]
+    return _percentual_de_mascara(saturado[y0 : y1 + 1], invertido=False)
 
 
 def _tem_realce_vermelho(h: np.ndarray, saturado: np.ndarray, realce_min_frac: float) -> bool:

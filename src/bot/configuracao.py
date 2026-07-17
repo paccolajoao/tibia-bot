@@ -150,6 +150,10 @@ class AlvoConfig(BaseModel):
     # Re-ataca antes disso só se uma criatura morrer; o timeout é a rede p/ clique perdido.
     # Curto (1.5s) para re-engajar rápido quando o clique não pega o alvo.
     recompromisso_s: float = 1.5
+    # watchdog de observabilidade: se o alvo atual ficar este tempo sem perder vida
+    # (mesmo engajado/reatacando), avisa no painel — provável alvo inalcançável/imune.
+    # NÃO troca de alvo nem muda a cadência de cliques, só sinaliza. 0 = desliga o aviso.
+    sem_dano_timeout_s: float = 10.0
     cooldown_s: dict[str, float] = Field(default_factory=lambda: {"atacar": 2.0})
     # Se definida, usa TECLA (ex.: "space") em vez de clique na battle list.
     # Requer que a tecla esteja bindada em Options > Hotkeys do Tibia como "Attack Closest".

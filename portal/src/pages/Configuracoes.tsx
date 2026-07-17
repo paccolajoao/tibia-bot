@@ -294,6 +294,7 @@ export function Configuracoes() {
             <div className="hidden sm:block" />
             <CampoNumero label="Prioridade" valor={v("alvo.prioridade")} onChange={(x) => set("alvo.prioridade", x)} dica="Abaixo da cura (100)." />
             <CampoNumero label="Recompromisso" sufixo="s" step={0.5} valor={v("alvo.recompromisso_s")} onChange={(x) => set("alvo.recompromisso_s", x)} dica="Não troca de alvo por este tempo após atacar." />
+            <CampoNumero label="Timeout sem dano" sufixo="s" step={1} min={0} valor={v("alvo.sem_dano_timeout_s")} onChange={(x) => set("alvo.sem_dano_timeout_s", x)} dica="Avisa no log se o alvo atual ficar esse tempo sem perder vida (não troca de alvo). 0 = desliga o aviso." />
             <CampoNumero label="Confiança mínima" step={0.05} min={0} max={1} valor={v("alvo.confianca_minima")} onChange={(x) => set("alvo.confianca_minima", x)} />
             <CampoNumero label="Cooldown atacar" sufixo="s" step={0.5} valor={v("alvo.cooldown_s.atacar")} onChange={(x) => set("alvo.cooldown_s.atacar", x)} />
             <CampoNumero label="Saturação mín. (s_min)" valor={v("alvo.s_min")} onChange={(x) => set("alvo.s_min", x)} />

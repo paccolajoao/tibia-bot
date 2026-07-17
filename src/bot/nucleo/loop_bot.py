@@ -26,6 +26,10 @@ from bot.visao.estabilizador import EstabilizadorBarra
 from bot.visao.lista_batalha import detectar_criaturas
 from bot.visao.tipos import DeteccaoCriaturas, LeituraBarra
 
+# margem de ruído (pontos percentuais) p/ considerar uma queda em `vida_primeira`
+# como dano real, e não jitter de anti-aliasing entre frames.
+MARGEM_DANO_PP = 2.0
+
 
 def _combinar_regioes(*regioes: Regiao) -> Regiao:
     ls = [r[0] for r in regioes]
@@ -132,6 +136,9 @@ class LoopBot(threading.Thread):
         # rastreio de mortes p/ o auto-loot (Saque lê via estado_comportamentos)
         self._saque_conf_min = cfg.saque.confianca_minima
         self._ultimo_n_criaturas: int | None = None
+        # rastreio de dano na 1ª criatura p/ o watchdog "sem dano" do Alvo
+        self._alvo_conf_min = cfg.visao.confianca_minima
+        self._ultima_vida_primeira: float | None = None
         # detecção de frames pretos (backend WGC retornando preto para DX11 Blt-model)
         self._ticks_sem_confianca = 0
         self._fallback_mss_feito = False
@@ -273,6 +280,7 @@ class LoopBot(threading.Thread):
 
         self.ctx.criaturas = self._detectar_battle_list(cfg)
         self._rastrear_mortes(self.ctx.criaturas, t0)
+        self._rastrear_dano_alvo(self.ctx.criaturas, t0)
         self._detectar_inventario()
         self._detectar_minimap()
 
@@ -447,6 +455,25 @@ class LoopBot(threading.Thread):
             # andando p/ fora da tela — é estimativa, não confirmação do cliente.
             self.ctx.estatisticas.abates += self._ultimo_n_criaturas - n
         self._ultimo_n_criaturas = n
+
+    def _rastrear_dano_alvo(self, det: DeteccaoCriaturas | None, ts: float) -> None:
+        """Detecta queda no preenchimento da 1ª criatura e carimba o ts no contexto.
+
+        Roda em TODO tick (mesmo motivo de `_rastrear_mortes`: o motor faz curto-
+        circuito, então o Alvo pode não rodar em todo tick). Alimenta o watchdog
+        "sem dano" do Alvo (ver alvo.py) — puramente informativo, não decide nada aqui.
+        Se a 1ª posição trocar de criatura (lista reordenou), a leitura pode subir ou
+        cair sem relação com dano real; na pior hipótese isso só reseta o watchdog
+        cedo demais (viés seguro: menos avisos, nunca mais travado).
+        """
+        vida = det.vida_primeira if det is not None else None
+        if vida is None or vida.confianca < self._alvo_conf_min:
+            self._ultima_vida_primeira = None
+            return
+        atual = vida.percentual
+        if self._ultima_vida_primeira is not None and atual < self._ultima_vida_primeira - MARGEM_DANO_PP:
+            self.ctx.estado_comportamentos["alvo_dano_ts"] = ts
+        self._ultima_vida_primeira = atual
 
     def _verificar_frames_pretos(self, ts: float) -> None:
         """Detecta se o backend está retornando frames sem conteúdo útil.

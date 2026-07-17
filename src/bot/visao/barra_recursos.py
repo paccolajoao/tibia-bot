@@ -49,6 +49,18 @@ def ler_percentual_barra(
     s = hsv[:, :, 1].astype(int)
     v = hsv[:, :, 2].astype(int)
     mascara = (v >= v_min) & (s >= s_min)  # 2D: preenchido por pixel
+    return _percentual_de_mascara(mascara, invertido)
+
+
+def _percentual_de_mascara(mascara: np.ndarray, invertido: bool = False) -> LeituraBarra:
+    """Converte uma máscara 2D (linhas x colunas) já classificada preenchido/vazio
+    num percentual + confiança. Extraído de `ler_percentual_barra` para ser
+    reaproveitado por outros detectores que já têm sua própria máscara HSV pronta
+    (ex.: `lista_batalha.py`, que classifica a battle list inteira de uma vez e só
+    precisa desse cálculo para a fatia de uma entrada específica).
+    """
+    if mascara.size == 0 or mascara.shape[1] < 2:
+        return LeituraBarra(0.0, 0.0)
 
     # Por coluna: cheia se uma fração mínima da altura estiver preenchida.
     fracao = mascara.mean(axis=0)  # fração preenchida de cada coluna

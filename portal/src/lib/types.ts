@@ -64,6 +64,7 @@ export interface AlvoConfig {
   s_min: number
   v_min: number
   recompromisso_s: number
+  sem_dano_timeout_s: number
   cooldown_s: Record<string, number>
   tecla: string | null
 }

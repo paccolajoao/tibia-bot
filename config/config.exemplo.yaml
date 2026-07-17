@@ -65,6 +65,8 @@ alvo:                     # targeting — só ativa se regioes.battle_list estiv
   v_min: 60               # brilho mín.
   recompromisso_s: 3.0    # após atacar, não troca de alvo por N s (deixa o Tibia matar);
                           # re-ataca antes disso só se uma criatura morrer
+  sem_dano_timeout_s: 10.0  # avisa no log se o alvo atual ficar esse tempo sem perder vida
+                             # (não troca de alvo nem muda a cadência de cliques). 0 = desliga
   cooldown_s:
     atacar: 2.0           # intervalo mínimo entre cliques de ataque
 

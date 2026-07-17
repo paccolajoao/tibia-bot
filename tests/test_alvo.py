@@ -122,6 +122,83 @@ def test_reataca_apos_timeout_de_recompromisso():
     assert dec.acao == TipoAcao.CLICAR
 
 
+# ----------------------------- watchdog "sem dano" (anti-travamento, log-only) -----------------------------
+# Convenção (igual a test_cavebot.py): nunca usar ts=0.0 como a 1ª chamada do watchdog —
+# `_engajado_desde == 0.0` é o sentinela de "ainda não semeado" (mirror do `_combate_inicio`
+# do Cavebot), então uma 1ª chamada em ts=0.0 faria a semeadura colidir com o sentinela.
+
+
+def test_avisa_sem_dano_apos_timeout():
+    # engajado em t=10; a 1ª chamada (fora do recompromisso_s) semeia o relógio do
+    # watchdog; a 2ª, 11s depois e sem sinal de dano/morte, já passou do timeout (10s).
+    ctx, cfg = _ctx(criaturas=_det(n=1, alvo_atual=False))
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 10.0
+    m = _alvo(cfg)
+    ctx.ts = 12.0
+    dec1 = m.decidir(ctx, 12.0)
+    assert dec1.acao == TipoAcao.CLICAR
+    assert "sem dano" not in dec1.motivo
+    ctx.ts = 23.0
+    dec2 = m.decidir(ctx, 23.0)
+    assert dec2.acao == TipoAcao.CLICAR
+    assert "sem dano" in dec2.motivo
+
+
+def test_nao_avisa_dentro_do_timeout():
+    ctx, cfg = _ctx(criaturas=_det(n=1, alvo_atual=False))
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 10.0
+    m = _alvo(cfg)
+    ctx.ts = 12.0
+    dec1 = m.decidir(ctx, 12.0)
+    assert "sem dano" not in dec1.motivo
+    ctx.ts = 20.0  # só 8s desde a semeadura (12.0) -> ainda dentro do timeout (10s)
+    dec2 = m.decidir(ctx, 20.0)
+    assert dec2.acao == TipoAcao.CLICAR
+    assert "sem dano" not in dec2.motivo
+
+
+def test_dano_reseta_relogio_sem_dano():
+    ctx, cfg = _ctx(criaturas=_det(n=1, alvo_atual=False))
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 10.0
+    m = _alvo(cfg)
+    ctx.ts = 12.0
+    m.decidir(ctx, 12.0)  # semeia o relógio em t=12
+    ctx.ts = 18.0
+    ctx.estado_comportamentos["alvo_dano_ts"] = 17.9  # dano observado -> reseta o relógio
+    dec2 = m.decidir(ctx, 18.0)
+    assert "sem dano" not in dec2.motivo  # só 0.1s desde o reset
+    ctx.ts = 21.0  # 11s desde a semeadura ORIGINAL (12.0), mas só 3s desde o dano (18.0)
+    dec3 = m.decidir(ctx, 21.0)
+    assert "sem dano" not in dec3.motivo
+
+
+def test_morte_reseta_relogio_sem_dano():
+    ctx, cfg = _ctx(criaturas=_det(n=1, alvo_atual=False))
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 10.0
+    m = _alvo(cfg)
+    ctx.ts = 12.0
+    m.decidir(ctx, 12.0)  # semeia o relógio em t=12
+    ctx.ts = 18.0
+    ctx.estado_comportamentos["saque_morte_ts"] = 17.9  # matou algo -> reseta o relógio
+    dec2 = m.decidir(ctx, 18.0)
+    assert "sem dano" not in dec2.motivo
+    ctx.ts = 21.0
+    dec3 = m.decidir(ctx, 21.0)
+    assert "sem dano" not in dec3.motivo
+
+
+def test_sem_dano_timeout_zero_desliga_aviso():
+    ctx, cfg = _ctx(criaturas=_det(n=1, alvo_atual=False))
+    cfg.alvo.sem_dano_timeout_s = 0.0
+    ctx.estado_comportamentos["alvo_engajado_ts"] = 10.0
+    m = _alvo(cfg)
+    ctx.ts = 12.0
+    m.decidir(ctx, 12.0)
+    ctx.ts = 100.0
+    dec = m.decidir(ctx, 100.0)
+    assert "sem dano" not in dec.motivo
+
+
 def test_auto_cura_preempta_alvo_no_mesmo_tick():
     # HP crítico + criatura presente: curar (prioridade 106) vence atacar (80)
     ctx, cfg = _ctx(criaturas=_det(), hp=20)

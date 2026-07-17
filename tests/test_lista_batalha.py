@@ -79,3 +79,42 @@ def test_confianca_baixa_quando_lista_coberta():
     img[:, :] = VERDE  # tudo saturado -> algo cobrindo a lista
     det = detectar_criaturas(img, _regiao(img))
     assert det.confianca < 0.6
+
+
+# ----------------------------- vida_primeira (watchdog "sem dano" do Alvo) -----------------------------
+# `vida_primeira` é lida sobre a largura TOTAL da região (não só o span do _bar() de conveniência
+# usado acima) — por isso os testes abaixo desenham a partir de x0=0, coerente com a suposição já
+# embutida em `linha_bar` (uma entrada de verdade satura boa parte da largura da lista).
+
+
+def test_vida_primeira_cheia_quando_bar_preenche_toda_largura():
+    img = _img()
+    _bar(img, 10, 16, x0=0, x1=200)  # preenche a largura toda -> ~100%
+    det = detectar_criaturas(img, _regiao(img))
+    assert det.vida_primeira is not None
+    assert det.vida_primeira.percentual >= 95
+
+
+def test_vida_primeira_parcial_quando_bar_preenche_metade():
+    img = _img()
+    _bar(img, 10, 16, x0=0, x1=100)  # metade da largura -> ~50%
+    det = detectar_criaturas(img, _regiao(img))
+    assert det.vida_primeira is not None
+    assert 35 <= det.vida_primeira.percentual <= 65
+
+
+def test_vida_primeira_none_sem_criaturas():
+    img = _img()
+    det = detectar_criaturas(img, _regiao(img))
+    assert det.vida_primeira is None
+
+
+def test_vida_primeira_usa_so_a_primeira_entrada():
+    img = _img()
+    _bar(img, 10, 16, x0=0, x1=200)  # 1ª criatura: cheia
+    # 2ª criatura: baixa (mas >= largura_min_frac=0.3 p/ ainda contar como entrada)
+    _bar(img, 40, 46, x0=0, x1=70)
+    det = detectar_criaturas(img, _regiao(img))
+    assert det.n_criaturas == 2
+    assert det.vida_primeira is not None
+    assert det.vida_primeira.percentual >= 95

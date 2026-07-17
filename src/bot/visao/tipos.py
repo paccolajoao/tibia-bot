@@ -21,6 +21,9 @@ class DeteccaoCriaturas:
     confianca: float  # 0.0 .. 1.0
     centro_primeira: tuple[int, int] | None = None  # coords da imagem
     ponto_clique: tuple[int, int] | None = None  # coords absolutas (preenchido pelo loop)
+    # preenchimento (%) do mini HP-bar da 1ª entrada (a criatura atacada) — usado pelo
+    # watchdog "sem dano" do Alvo p/ perceber alvo inalcançável/imune. None sem criaturas.
+    vida_primeira: LeituraBarra | None = None
 
 
 @dataclass
