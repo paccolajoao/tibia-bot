@@ -92,6 +92,7 @@ class EventoStats:
     saques: int = 0
     curas_forte: int = 0
     curas_leve: int = 0
+    pocoes_vida: int = 0
     usos_mana: int = 0
     abates: int = 0
     passos_cavebot: int = 0

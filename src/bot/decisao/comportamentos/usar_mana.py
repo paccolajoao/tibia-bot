@@ -2,7 +2,7 @@
 
 Enquanto mana >= mana_alto, pressiona a tecla configurada (cura forte por padrão)
 para gastar mana. Para quando mana < mana_alvo (histerese p/ não oscilar na borda).
-Prioridade baixa: roda só quando AutoCura, Alvo e Saque não têm nada a fazer.
+Prioridade baixa: roda só quando as camadas de cura, Alvo e Saque não têm nada a fazer.
 """
 
 from __future__ import annotations

@@ -157,10 +157,11 @@ export function Dashboard() {
                 sub={porMinuto(t.stats?.ataques, t.stats?.uptime_s)}
               />
               <Estatistica
-                rotulo="curas"
+                rotulo="curas (magia)"
                 valor={t.stats?.curas ?? 0}
                 sub={`forte ${t.stats?.curas_forte ?? 0} · leve ${t.stats?.curas_leve ?? 0}`}
               />
+              <Estatistica rotulo="poções vida" valor={t.stats?.pocoes_vida ?? 0} />
               <Estatistica rotulo="saques" valor={t.stats?.saques ?? 0} sub={porMinuto(t.stats?.saques, t.stats?.uptime_s)} />
               <Estatistica rotulo="poções mana" valor={t.stats?.pocoes_mana ?? 0} />
               <Estatistica rotulo="usos mana (treino)" valor={t.stats?.usos_mana ?? 0} />

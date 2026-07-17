@@ -10,9 +10,10 @@ from dataclasses import dataclass, field
 class Estatisticas:
     inicio_ts: float = field(default_factory=time.perf_counter)
     curas: int = 0  # curas de HP disparadas (forte + leve) — total
-    curas_forte: int = 0  # subset: HP crítico -> cura forte
-    curas_leve: int = 0  # subset: HP baixo -> cura leve
-    pocoes_mana: int = 0  # poções de mana (HP/mana baixos)
+    curas_forte: int = 0  # subset: HP crítico -> cura forte (magia)
+    curas_leve: int = 0  # subset: HP baixo -> cura leve (magia)
+    pocoes_vida: int = 0  # poções de vida (HP amarelo)
+    pocoes_mana: int = 0  # poções de mana
     usos_mana: int = 0  # descargas de mana p/ treino de ML (comportamento usar_mana)
     ataques: int = 0  # cliques de alvo na battle list (targeting, não hits confirmados)
     refeicoes: int = 0  # presses de comida
@@ -27,6 +28,8 @@ class Estatisticas:
         recurso = decisao.dados.get("recurso")
         if recurso == "mana":
             self.pocoes_mana += 1
+        elif recurso == "pocao_vida":
+            self.pocoes_vida += 1
         elif recurso == "mana_uso":
             self.usos_mana += 1
         elif recurso == "alvo":

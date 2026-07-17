@@ -21,6 +21,7 @@ from bot.nucleo.estado_execucao import ControladorExecucao, EstadoExecucao
 from bot.telemetria import eventos as ev
 from bot.visao.anotador import desenhar_overlay
 from bot.visao.barra_recursos import ler_percentual_barra
+from bot.visao.estabilizador import EstabilizadorBarra
 from bot.visao.lista_batalha import detectar_criaturas
 from bot.visao.tipos import DeteccaoCriaturas, LeituraBarra
 
@@ -96,6 +97,10 @@ class LoopBot(threading.Thread):
         self._reg_hp = tuple(cfg.regioes.hp)
         self._reg_mana = tuple(cfg.regioes.mana)
         self._regiao_combinada = _combinar_regioes(self._reg_hp, self._reg_mana)
+        # estabilização entre frames: rejeita HP-fantasma por oclusão (0%/100% falso) e
+        # segura o último valor bom por um TTL curto p/ a cura não ficar cega em burst.
+        self._estab_hp = EstabilizadorBarra(cfg.visao.confianca_minima) if cfg.visao.estabilizar_barras else None
+        self._estab_mana = EstabilizadorBarra(cfg.visao.confianca_minima) if cfg.visao.estabilizar_barras else None
         self._battle_ativo = cfg.regioes.battle_list_calibrado
         self._reg_battle = tuple(cfg.regioes.battle_list) if self._battle_ativo else None
         # drop de loot: varre o inventário e arrasta itens cadastrados p/ um tile do chão
@@ -257,6 +262,9 @@ class LoopBot(threading.Thread):
         self.ctx.mana = ler_percentual_barra(
             frame.imagem, reg_mana_img, cfg.visao.mana.v_min, cfg.visao.mana.s_min, cfg.visao.mana.invertido
         )
+        if self._estab_hp is not None:
+            self.ctx.hp = self._estab_hp.estabilizar(self.ctx.hp, t0)
+            self.ctx.mana = self._estab_mana.estabilizar(self.ctx.mana, t0)
 
         self._verificar_frames_pretos(t0)
 
@@ -569,6 +577,7 @@ class LoopBot(threading.Thread):
                 saques=e.saques,
                 curas_forte=e.curas_forte,
                 curas_leve=e.curas_leve,
+                pocoes_vida=e.pocoes_vida,
                 usos_mana=e.usos_mana,
                 abates=e.abates,
                 passos_cavebot=e.passos_cavebot,

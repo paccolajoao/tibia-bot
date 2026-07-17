@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from bot.configuracao import Config, MagiaAtaqueConfig
 from bot.contexto import Contexto
-from bot.decisao.comportamentos.auto_cura import AutoCura
+from bot.decisao.comportamentos.camada_cura import cooldowns_cura, montar_camadas_cura
 from bot.decisao.comportamentos.magia_ataque import MagiaAtaque
 from bot.decisao.cooldown import GerenciadorCooldown
 from bot.decisao.motor import MotorDecisao
@@ -77,9 +77,9 @@ def test_cura_preempta_magia_ataque():
     ctx = _ctx()
     ctx.hp = LeituraBarra(20.0, 1.0)  # HP crítico
     base = Config()
-    cooldown = GerenciadorCooldown({**base.cura.cooldown_s, "magia_ataque": cfg.intervalo_s})
+    cooldown = GerenciadorCooldown({**cooldowns_cura(base.cura), "magia_ataque": cfg.intervalo_s})
     motor = MotorDecisao(
-        [AutoCura(base.cura, base.visao.confianca_minima), MagiaAtaque(cfg)], cooldown
+        [*montar_camadas_cura(base.cura, base.visao.confianca_minima), MagiaAtaque(cfg)], cooldown
     )
     dec = motor.decidir(ctx, 0.0)
     assert dec.acao == TipoAcao.PRESSIONAR_TECLA

@@ -44,17 +44,19 @@ visao:
     v_min: 60
     s_min: 50
 
-cura:
-  hp_critico: 35          # HP% <= -> cura forte
-  hp_baixo: 60            # HP% <= -> cura leve
-  mana_baixa: 40          # Mana% <= -> poção de mana
-  tecla_cura_forte: f5
-  tecla_cura_leve: f6
-  tecla_pocao_mana: f1
-  cooldown_s:             # intervalo mínimo entre disparos da MESMA tecla (anti-spam)
-    f5: 1.0
-    f6: 1.0
-    f1: 1.0
+cura:                     # 4 camadas: magia forte/leve + poção de vida/mana
+  hp_critico: 35          # HP% <= -> cura forte (magia de emergência)
+  hp_pocao_vida: 65       # HP% <= -> poção de vida ("amarelo")
+  hp_baixo: 90            # HP% <= -> cura leve (magia básica, ex.: exura ico)
+  mana_baixa: 40          # Mana% <= -> poção de mana (é o "alvo": bebe até chegar aqui)
+  mana_hp_seguro: 70      # NÃO bebe poção de mana com HP <= isto (reserva o cd das poções p/ vida)
+  tecla_cura_forte: "1"
+  tecla_pocao_vida: f1
+  tecla_cura_leve: f3
+  tecla_pocao_mana: f2
+  cd_cura_forte: 120.0    # magia de emergência (cd longo = panic)
+  cd_cura_leve: 2.0       # magia básica (~2s)
+  cd_pocao: 1.0           # cooldown COMPARTILHADO das poções (vida + mana)
 
 alvo:                     # targeting — só ativa se regioes.battle_list estiver calibrada
   prioridade: 80          # abaixo de cura (100): sobreviver antes de atacar

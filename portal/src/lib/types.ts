@@ -36,6 +36,7 @@ export interface Classificador {
 
 export interface VisaoConfig {
   confianca_minima: number
+  estabilizar_barras: boolean
   hp: Classificador
   mana: Classificador
 }
@@ -43,12 +44,17 @@ export interface VisaoConfig {
 export interface CuraConfig {
   ativo: boolean
   hp_critico: number
+  hp_pocao_vida: number
   hp_baixo: number
   mana_baixa: number
+  mana_hp_seguro: number
   tecla_cura_forte: string
+  tecla_pocao_vida: string
   tecla_cura_leve: string
   tecla_pocao_mana: string
-  cooldown_s: Record<string, number>
+  cd_cura_forte: number
+  cd_cura_leve: number
+  cd_pocao: number
 }
 
 export interface AlvoConfig {
@@ -223,6 +229,7 @@ export interface TelemetriaStats {
   curas: number
   curas_forte?: number
   curas_leve?: number
+  pocoes_vida?: number
   pocoes_mana: number
   usos_mana?: number
   ataques?: number

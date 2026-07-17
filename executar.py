@@ -14,7 +14,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent / "src"))
 from bot.captura.fabrica import criar_capturador  # noqa: E402
 from bot.contexto import Contexto  # noqa: E402
 from bot.decisao.comportamentos.alvo import Alvo  # noqa: E402
-from bot.decisao.comportamentos.auto_cura import AutoCura  # noqa: E402
+from bot.decisao.comportamentos.camada_cura import (  # noqa: E402
+    cooldowns_cura,
+    montar_camadas_cura,
+)
 from bot.decisao.comportamentos.cavebot import (
     CHAVE_COOLDOWN as CHAVE_COOLDOWN_CAVEBOT,  # noqa: E402
 )
@@ -62,12 +65,22 @@ def _montar_loop(cfg, controlador, barramento, log) -> LoopBot:
     usar_mana_cd = {CHAVE_COOLDOWN_USAR_MANA: cfg.usar_mana.cooldown_s} if cfg.usar_mana.ativo else {}
     cavebot_cd = {CHAVE_COOLDOWN_CAVEBOT: cfg.cavebot.cooldown_s} if cfg.cavebot.ativo else {}
     magia_cd = {CHAVE_COOLDOWN_MAGIA: cfg.magia_ataque.intervalo_s} if cfg.magia_ataque.ativo else {}
+    cura_cd = cooldowns_cura(cfg.cura) if cfg.cura.ativo else {}
     cooldown = GerenciadorCooldown(
-        {**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s, **usar_mana_cd, **cavebot_cd, **magia_cd}
+        {**cura_cd, **cfg.alvo.cooldown_s, **usar_mana_cd, **cavebot_cd, **magia_cd}
     )
     comportamentos = []
     if cfg.cura.ativo:
-        comportamentos.append(AutoCura(cfg.cura, cfg.visao.confianca_minima))
+        comportamentos.extend(montar_camadas_cura(cfg.cura, cfg.visao.confianca_minima))
+        log("Auto-cura habilitada -> 4 camadas (cura forte/leve, poção de vida/mana)")
+        # avisa se os limiares estão fora de ordem (a cascata assume forte <= vida <= leve)
+        c = cfg.cura
+        if c.hp_critico > c.hp_pocao_vida or c.hp_pocao_vida > c.hp_baixo:
+            log(
+                f"Limiares de cura fora de ordem (crítico {c.hp_critico:.0f} <= poção-vida"
+                f" {c.hp_pocao_vida:.0f} <= baixo {c.hp_baixo:.0f}?) — revise na aba Cura",
+                "alerta",
+            )
     else:
         log("Auto-cura desligada (recurso desativado na config)", "alerta")
     if cfg.regioes.battle_list_calibrado:

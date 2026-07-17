@@ -228,8 +228,8 @@ menos um waypoint gravado.
 executar.py / calibrar.py        # entrypoints
 src/bot/
   captura/    base · dxgi · wgc · mss_fallback · obs_virtualcam · mapeamento · tibia_arquivo · instantaneo · fabrica
-  visao/      barra_recursos · lista_batalha · inventario · minimap · anotador · tipos
-  decisao/    motor · cooldown · comportamentos/(auto_cura, alvo, comer, saque, drop, usar_mana, magia_ataque, cavebot)
+  visao/      barra_recursos · estabilizador · lista_batalha · inventario · minimap · anotador · tipos
+  decisao/    motor · cooldown · comportamentos/(camada_cura, alvo, comer, saque, drop, usar_mana, magia_ataque, cavebot)
   telemetria/ eventos · barramento · estatisticas
   entrada/    teclado_directinput · atrasos · simulada
   nucleo/     loop_bot · estado_execucao · seguranca

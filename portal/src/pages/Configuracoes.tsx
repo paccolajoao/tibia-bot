@@ -246,15 +246,25 @@ export function Configuracoes() {
         </TabsContent>
 
         <TabsContent value="cura" className="space-y-6">
-          <Secao titulo="Auto-cura" descricao="Limiares de HP/Mana e teclas de cura (prioridade máxima).">
-            <CampoSwitch label="Ativo" dica="Liga/desliga a auto-cura (também na aba Recursos)." valor={v("cura.ativo")} onChange={(x) => set("cura.ativo", x)} />
+          <Secao titulo="Auto-cura (4 camadas)" descricao="Magia forte/leve + poção de vida/mana (prioridade máxima). As poções compartilham 1 cooldown; magia e poção podem sair no mesmo turno.">
+            <CampoSwitch label="Ativo" dica="Liga/desliga as 4 camadas (também na aba Recursos)." valor={v("cura.ativo")} onChange={(x) => set("cura.ativo", x)} />
             <div className="hidden sm:block" />
-            <CampoNumero label="HP crítico" sufixo="%" min={0} max={100} valor={v("cura.hp_critico")} onChange={(x) => set("cura.hp_critico", x)} dica="Abaixo disso, cura forte." />
-            <CampoNumero label="HP baixo" sufixo="%" valor={v("cura.hp_baixo")} onChange={(x) => set("cura.hp_baixo", x)} dica="Abaixo disso, cura leve." />
-            <CampoNumero label="Mana baixa" sufixo="%" valor={v("cura.mana_baixa")} onChange={(x) => set("cura.mana_baixa", x)} dica="Abaixo disso, poção de mana." />
-            <CampoTecla label="Tecla cura forte (HP crítico)" dica="Pode ser poção OU magia — o que você bindar nessa hotkey no Tibia. Dispara no HP crítico." valor={v("cura.tecla_cura_forte")} onChange={(x) => set("cura.tecla_cura_forte", x)} />
-            <CampoTecla label="Tecla cura leve (HP baixo)" dica="Pode ser magia OU poção. Dispara no HP baixo (acima do crítico)." valor={v("cura.tecla_cura_leve")} onChange={(x) => set("cura.tecla_cura_leve", x)} />
-            <CampoTecla label="Tecla poção mana" valor={v("cura.tecla_pocao_mana")} onChange={(x) => set("cura.tecla_pocao_mana", x)} />
+
+            <CampoNumero label="HP crítico" sufixo="%" min={0} max={100} valor={v("cura.hp_critico")} onChange={(x) => set("cura.hp_critico", x)} dica="Abaixo disso: cura forte (magia de emergência)." />
+            <CampoNumero label="HP poção de vida" sufixo="%" min={0} max={100} valor={v("cura.hp_pocao_vida")} onChange={(x) => set("cura.hp_pocao_vida", x)} dica="'Amarelo': abaixo disso bebe poção de vida." />
+            <CampoNumero label="HP baixo" sufixo="%" min={0} max={100} valor={v("cura.hp_baixo")} onChange={(x) => set("cura.hp_baixo", x)} dica="Abaixo disso: cura leve (magia básica, ex.: exura ico)." />
+            <CampoNumero label="Mana (alvo)" sufixo="%" min={0} max={100} valor={v("cura.mana_baixa")} onChange={(x) => set("cura.mana_baixa", x)} dica="Bebe poção de mana enquanto a mana estiver abaixo disso." />
+            <CampoNumero label="HP seguro p/ poção de mana" sufixo="%" min={0} max={100} valor={v("cura.mana_hp_seguro")} onChange={(x) => set("cura.mana_hp_seguro", x)} dica="Não bebe poção de mana com HP abaixo disso (reserva o cooldown das poções para a vida)." />
+            <div className="hidden sm:block" />
+
+            <CampoTecla label="Tecla cura forte (HP crítico)" dica="Magia de emergência (ex.: exura gran ico). Dispara no HP crítico." valor={v("cura.tecla_cura_forte")} onChange={(x) => set("cura.tecla_cura_forte", x)} />
+            <CampoTecla label="Tecla poção de vida (HP amarelo)" dica="Poção de vida. Compartilha cooldown com a poção de mana." valor={v("cura.tecla_pocao_vida")} onChange={(x) => set("cura.tecla_pocao_vida", x)} />
+            <CampoTecla label="Tecla cura leve (HP baixo)" dica="Magia básica (ex.: exura ico). Dispara enquanto o HP não está cheio." valor={v("cura.tecla_cura_leve")} onChange={(x) => set("cura.tecla_cura_leve", x)} />
+            <CampoTecla label="Tecla poção de mana" dica="Poção de mana. Compartilha cooldown com a poção de vida." valor={v("cura.tecla_pocao_mana")} onChange={(x) => set("cura.tecla_pocao_mana", x)} />
+
+            <CampoNumero label="Cooldown cura forte" sufixo="s" step={1} min={0} valor={v("cura.cd_cura_forte")} onChange={(x) => set("cura.cd_cura_forte", x)} dica="Magia de emergência (cd longo, ~120s = panic). Se o seu exura gran ico tiver cd curto (~1s), coloque ~1." />
+            <CampoNumero label="Cooldown cura leve" sufixo="s" step={0.5} min={0} valor={v("cura.cd_cura_leve")} onChange={(x) => set("cura.cd_cura_leve", x)} dica="Magia básica (~2s)." />
+            <CampoNumero label="Cooldown poções (compartilhado)" sufixo="s" step={0.5} min={0} valor={v("cura.cd_pocao")} onChange={(x) => set("cura.cd_pocao", x)} dica="Uma poção (vida OU mana) por este intervalo. Deixe ~1.0-1.1s (um pouco acima do exhaust real)." />
           </Secao>
         </TabsContent>
 

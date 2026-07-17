@@ -34,6 +34,33 @@ def test_get_e_put_config(client):
     assert client.get("/api/config").json()["cura"]["hp_critico"] == 22.0
 
 
+def test_config_cura_camadas_roundtrip(client):
+    """Prova que TODAS as configs das 4 camadas passam pelo portal (API), sem YAML."""
+    cfg = client.get("/api/config").json()
+    cura = cfg["cura"]
+    # os campos novos chegam no payload que o portal recebe (GET)
+    for campo in (
+        "hp_pocao_vida", "mana_hp_seguro", "tecla_pocao_vida",
+        "cd_cura_forte", "cd_cura_leve", "cd_pocao",
+    ):
+        assert campo in cura, campo
+    # o portal edita e salva (PUT) — inclusive as hotkeys
+    cura.update({
+        "tecla_cura_forte": "1", "tecla_pocao_vida": "f1",
+        "tecla_cura_leve": "f3", "tecla_pocao_mana": "f2",
+        "hp_pocao_vida": 60.0, "mana_hp_seguro": 75.0, "cd_pocao": 1.2,
+    })
+    assert client.put("/api/config", json=cfg).status_code == 200
+    # persistiu no SQLite e volta no próximo GET
+    salvo = client.get("/api/config").json()["cura"]
+    assert salvo["tecla_cura_forte"] == "1"
+    assert salvo["tecla_pocao_vida"] == "f1"
+    assert salvo["tecla_cura_leve"] == "f3"
+    assert salvo["tecla_pocao_mana"] == "f2"
+    assert salvo["hp_pocao_vida"] == 60.0
+    assert salvo["cd_pocao"] == 1.2
+
+
 def test_put_config_invalido_rejeitado(client):
     cfg = client.get("/api/config").json()
     cfg["cura"]["hp_critico"] = "não-é-número"

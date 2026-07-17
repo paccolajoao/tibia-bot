@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from bot.configuracao import Config, Waypoint
 from bot.contexto import Contexto
-from bot.decisao.comportamentos.auto_cura import AutoCura
+from bot.decisao.comportamentos.camada_cura import cooldowns_cura, montar_camadas_cura
 from bot.decisao.comportamentos.cavebot import Cavebot
 from bot.decisao.cooldown import GerenciadorCooldown
 from bot.decisao.motor import MotorDecisao
@@ -165,9 +165,9 @@ def test_cavebot_perde_para_cura():
     cfg = _cfg([Waypoint(tipo="ir", x=1, y=1)])
     ctx = _ctx(cfg)
     ctx.hp = LeituraBarra(20.0, 1.0)  # HP crítico
-    cooldown = GerenciadorCooldown({**cfg.cura.cooldown_s})
+    cooldown = GerenciadorCooldown({**cooldowns_cura(cfg.cura)})
     motor = MotorDecisao(
-        [AutoCura(cfg.cura, cfg.visao.confianca_minima), Cavebot(cfg.cavebot)], cooldown
+        [*montar_camadas_cura(cfg.cura, cfg.visao.confianca_minima), Cavebot(cfg.cavebot)], cooldown
     )
     dec = motor.decidir(ctx, 0.0)
     assert dec.acao == TipoAcao.PRESSIONAR_TECLA

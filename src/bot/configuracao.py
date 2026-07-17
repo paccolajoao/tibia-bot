@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # (left, top, right, bottom) em pixels absolutos do desktop
 Regiao = tuple[int, int, int, int]
@@ -85,22 +85,57 @@ class ClassificadorConfig(BaseModel):
 
 class VisaoConfig(BaseModel):
     confianca_minima: float = 0.6
+    # estabiliza as leituras de HP/Mana entre frames: rejeita extremos uniformes
+    # (barra ocluída lida como 0%/100% "confiável") e segura o último valor bom por
+    # um TTL curto, p/ a cura não parar/errar por leitura suja (ver visao/estabilizador.py).
+    estabilizar_barras: bool = True
     hp: ClassificadorConfig = Field(default_factory=ClassificadorConfig)
     # mana enche da direita->esquerda por padrão (comportamento do cliente Tibia)
     mana: ClassificadorConfig = Field(default_factory=lambda: ClassificadorConfig(invertido=True))
 
 
 class CuraConfig(BaseModel):
-    ativo: bool = True  # liga/desliga o comportamento de auto-cura
-    hp_critico: float = 35.0
-    hp_baixo: float = 60.0
-    mana_baixa: float = 40.0
-    tecla_cura_forte: str = "f5"
-    tecla_cura_leve: str = "f6"
-    tecla_pocao_mana: str = "f1"
-    cooldown_s: dict[str, float] = Field(
-        default_factory=lambda: {"f5": 1.0, "f6": 1.0, "f1": 1.0}
-    )
+    """Auto-cura em 4 camadas (ver decisao/comportamentos/camada_cura.py).
+
+    Cada camada dispara quando a barra (HP ou mana) <= seu limiar. As poções (vida
+    e mana) compartilham UM cooldown (`cd_pocao`) — modela o "exhaust" do Tibia, que
+    impede beber duas poções no mesmo turno. As magias têm cooldown próprio, então
+    saem no mesmo turno que uma poção (grupos diferentes no jogo).
+    """
+
+    ativo: bool = True  # UM toggle liga/desliga as 4 camadas (aba Recursos)
+
+    # limiares de HP (%) — dispara quando a barra <= limiar
+    hp_critico: float = Field(default=35.0, ge=0.0, le=100.0)  # <= : cura forte (magia de emergência)
+    hp_pocao_vida: float = Field(default=65.0, ge=0.0, le=100.0)  # <= : "amarelo" -> poção de vida
+    hp_baixo: float = Field(default=90.0, ge=0.0, le=100.0)  # <= : cura leve (magia básica)
+
+    # mana (%)
+    mana_baixa: float = Field(default=40.0, ge=0.0, le=100.0)  # bebe poção de mana enquanto mana <= isto
+    mana_hp_seguro: float = Field(default=70.0, ge=0.0, le=100.0)  # NÃO bebe poção de mana com HP <= isto
+
+    # teclas (hotkeys bindadas no Tibia)
+    tecla_cura_forte: str = "1"  # magia de emergência
+    tecla_pocao_vida: str = "f1"  # poção de vida
+    tecla_cura_leve: str = "f3"  # magia básica (cura simples)
+    tecla_pocao_mana: str = "f2"  # poção de mana
+
+    # cooldowns por GRUPO, em segundos (não por tecla)
+    cd_cura_forte: float = Field(default=120.0, ge=0.0)  # magia de emergência (cd longo, panic)
+    cd_cura_leve: float = Field(default=2.0, ge=0.0)  # magia básica (~2s)
+    cd_pocao: float = Field(default=1.0, ge=0.0)  # cooldown COMPARTILHADO das poções (vida+mana)
+
+    @model_validator(mode="after")
+    def _clamp_seguranca(self) -> CuraConfig:
+        # piso do cooldown de poção: curto demais faz o bot tentar uma 2ª poção que o
+        # jogo recusa e desperdiça o tick (comendo a vez da magia).
+        if self.cd_pocao < 0.5:
+            self.cd_pocao = 0.5
+        # mana raramente lê 100% (anti-aliasing + dígitos ~96-99%); alvo em 100
+        # dispararia sempre e starvaria a poção de vida no cooldown compartilhado.
+        if self.mana_baixa > 97.0:
+            self.mana_baixa = 97.0
+        return self
 
 
 class AlvoConfig(BaseModel):

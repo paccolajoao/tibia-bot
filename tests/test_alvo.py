@@ -5,7 +5,7 @@ from __future__ import annotations
 from bot.configuracao import Config
 from bot.contexto import Contexto
 from bot.decisao.comportamentos.alvo import Alvo
-from bot.decisao.comportamentos.auto_cura import AutoCura
+from bot.decisao.comportamentos.camada_cura import cooldowns_cura, montar_camadas_cura
 from bot.decisao.cooldown import GerenciadorCooldown
 from bot.decisao.motor import MotorDecisao
 from bot.decisao.tipos import TipoAcao
@@ -26,7 +26,7 @@ def _det(n=1, alvo_atual=False, confianca=1.0, ponto=(110, 205)):
 
 
 def _motor(cfg, comportamentos):
-    cooldown = GerenciadorCooldown({**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s})
+    cooldown = GerenciadorCooldown({**cooldowns_cura(cfg.cura), **cfg.alvo.cooldown_s})
     return MotorDecisao(comportamentos, cooldown)
 
 
@@ -123,9 +123,12 @@ def test_reataca_apos_timeout_de_recompromisso():
 
 
 def test_auto_cura_preempta_alvo_no_mesmo_tick():
-    # HP crítico + criatura presente: curar (prioridade 100) vence atacar (80)
+    # HP crítico + criatura presente: curar (prioridade 106) vence atacar (80)
     ctx, cfg = _ctx(criaturas=_det(), hp=20)
-    m = _motor(cfg, [AutoCura(cfg.cura, cfg.visao.confianca_minima), Alvo(cfg.alvo, cfg.visao.confianca_minima)])
+    m = _motor(
+        cfg,
+        [*montar_camadas_cura(cfg.cura, cfg.visao.confianca_minima), Alvo(cfg.alvo, cfg.visao.confianca_minima)],
+    )
     dec = m.decidir(ctx, 0.0)
     assert dec.acao == TipoAcao.PRESSIONAR_TECLA
     assert dec.tecla == cfg.cura.tecla_cura_forte

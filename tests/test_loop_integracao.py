@@ -12,7 +12,7 @@ from bot.captura.base import Frame
 from bot.configuracao import Config
 from bot.contexto import Contexto
 from bot.decisao.comportamentos.alvo import Alvo
-from bot.decisao.comportamentos.auto_cura import AutoCura
+from bot.decisao.comportamentos.camada_cura import cooldowns_cura, montar_camadas_cura
 from bot.decisao.comportamentos.comer import Comer
 from bot.decisao.comportamentos.saque import Saque
 from bot.decisao.cooldown import GerenciadorCooldown
@@ -111,18 +111,21 @@ def test_loop_dispara_cura_quando_hp_baixo(fazer_barra):
     bus = BarramentoEventos(maxsize=10000)
     ctrl = ControladorExecucao()
     motor = MotorDecisao(
-        [AutoCura(cfg.cura, cfg.visao.confianca_minima)],
-        GerenciadorCooldown(cfg.cura.cooldown_s),
+        montar_camadas_cura(cfg.cura, cfg.visao.confianca_minima),
+        GerenciadorCooldown(cooldowns_cura(cfg.cura)),
     )
     entrada = EntradaSimulada()
 
     loop = LoopBot(ctx, CapFake(_imagem(fazer_barra)), entrada, motor, ctrl, SegFake(), bus, max_ticks=3)
     loop.run()  # síncrono até max_ticks
 
-    # HP 20% <= crítico (35%) -> cura forte; cooldown impede repetir nos ticks seguintes
-    assert cfg.cura.tecla_cura_forte in entrada.teclas
+    # HP 20% dispara a cascata em ticks adjacentes: cura forte (tick 1), poção de vida
+    # (tick 2, cura_forte em cd), cura leve (tick 3, poção em cd). Cada uma 1x.
     assert entrada.teclas.count(cfg.cura.tecla_cura_forte) == 1
-    assert ctx.estatisticas.curas == 1
+    assert cfg.cura.tecla_pocao_vida in entrada.teclas
+    assert cfg.cura.tecla_cura_leve in entrada.teclas
+    assert ctx.estatisticas.curas == 2  # forte + leve (magias de HP)
+    assert ctx.estatisticas.pocoes_vida == 1
 
 
 def _imagem_com_criatura(fazer_barra):
@@ -145,8 +148,8 @@ def test_loop_clica_na_battle_list_quando_ha_criatura(fazer_barra):
     bus = BarramentoEventos(maxsize=10000)
     ctrl = ControladorExecucao()
     motor = MotorDecisao(
-        [AutoCura(cfg.cura, cfg.visao.confianca_minima), Alvo(cfg.alvo, cfg.visao.confianca_minima)],
-        GerenciadorCooldown({**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s}),
+        [*montar_camadas_cura(cfg.cura, cfg.visao.confianca_minima), Alvo(cfg.alvo, cfg.visao.confianca_minima)],
+        GerenciadorCooldown({**cooldowns_cura(cfg.cura), **cfg.alvo.cooldown_s}),
     )
     entrada = EntradaSimulada()
 
@@ -190,11 +193,11 @@ def test_loop_quick_loot_quando_criatura_morre(fazer_barra):
     ctrl = ControladorExecucao()
     motor = MotorDecisao(
         [
-            AutoCura(cfg.cura, cfg.visao.confianca_minima),
+            *montar_camadas_cura(cfg.cura, cfg.visao.confianca_minima),
             Alvo(cfg.alvo, cfg.visao.confianca_minima),
             Saque(cfg.saque),
         ],
-        GerenciadorCooldown({**cfg.cura.cooldown_s, **cfg.alvo.cooldown_s}),
+        GerenciadorCooldown({**cooldowns_cura(cfg.cura), **cfg.alvo.cooldown_s}),
     )
     entrada = EntradaSimulada()
 
@@ -246,7 +249,8 @@ def test_loop_sobrevive_a_excecao_no_tick():
     bus = BarramentoEventos(maxsize=10000)
     ctrl = ControladorExecucao()
     motor = MotorDecisao(
-        [AutoCura(cfg.cura, cfg.visao.confianca_minima)], GerenciadorCooldown(cfg.cura.cooldown_s)
+        montar_camadas_cura(cfg.cura, cfg.visao.confianca_minima),
+        GerenciadorCooldown(cooldowns_cura(cfg.cura)),
     )
     cap = CapErro()
     loop = LoopBot(ctx, cap, EntradaSimulada(), motor, ctrl, SegFake(), bus, max_ticks=3)
