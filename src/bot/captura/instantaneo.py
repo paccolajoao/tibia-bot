@@ -33,8 +33,41 @@ class FrameCalibracao:
     backend: str
 
 
+def _empacotar(frame, backend: str, emitir) -> FrameCalibracao | None:
+    """Valida um frame cru e empacota num FrameCalibracao (None se preto/vazio)."""
+    if frame is None or frame.imagem is None or frame.imagem.size == 0:
+        return None
+
+    img = frame.imagem
+    if float(img.mean()) < 15:  # mesmo limiar do calibrar.py: conteúdo de jogo vs. preto
+        emitir("Frame de calibração veio quase preto (WDA/cena OBS?).", "alerta")
+        return None
+
+    h, w = img.shape[:2]
+    origem_x, origem_y = (frame.regiao[0], frame.regiao[1]) if frame.regiao else (0, 0)
+    return FrameCalibracao(
+        imagem=img, largura=w, altura=h, origem_x=origem_x, origem_y=origem_y, backend=backend
+    )
+
+
+def frame_de_capturador(cap, log=None) -> FrameCalibracao | None:
+    """Pega um frame de um capturador JÁ EM EXECUÇÃO (sem abrir/fechar device).
+
+    Usado quando o bot está rodando: abrir um 2º handle do mesmo device (sobretudo
+    a OBS Virtual Camera, que o DirectShow não compartilha) faz o `read()` da thread
+    do bot estourar e derrubar a captura. Reaproveitar o último frame evita o conflito.
+    """
+    emitir = log or (lambda *_a, **_k: None)
+    frame = cap.capturar(None)
+    return _empacotar(frame, getattr(cap, "nome_backend", "?"), emitir)
+
+
 def capturar_frame_calibracao(cfg, log=None) -> FrameCalibracao | None:
-    """Captura um frame conforme o backend configurado. Retorna None se vier preto/sem frame."""
+    """Captura um frame conforme o backend configurado. Retorna None se vier preto/sem frame.
+
+    Abre um capturador NOVO — use só quando o bot não está rodando. Com o bot ativo,
+    prefira `frame_de_capturador(loop.cap)` para não abrir um 2º handle do device.
+    """
     emitir = log or (lambda *_a, **_k: None)
     cap = criar_capturador(
         cfg.captura.backend,
@@ -56,19 +89,7 @@ def capturar_frame_calibracao(cfg, log=None) -> FrameCalibracao | None:
         except Exception:
             pass
 
-    if frame is None or frame.imagem is None or frame.imagem.size == 0:
-        return None
-
-    img = frame.imagem
-    if float(img.mean()) < 15:  # mesmo limiar do calibrar.py: conteúdo de jogo vs. preto
-        emitir("Frame de calibração veio quase preto (WDA/cena OBS?).", "alerta")
-        return None
-
-    h, w = img.shape[:2]
-    origem_x, origem_y = (frame.regiao[0], frame.regiao[1]) if frame.regiao else (0, 0)
-    return FrameCalibracao(
-        imagem=img, largura=w, altura=h, origem_x=origem_x, origem_y=origem_y, backend=cap.nome_backend
-    )
+    return _empacotar(frame, cap.nome_backend, emitir)
 
 
 def codificar_jpeg(imagem: np.ndarray, qualidade: int = 80) -> bytes:

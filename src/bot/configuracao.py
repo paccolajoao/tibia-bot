@@ -219,9 +219,15 @@ class UsarManaConfig(BaseModel):
 class Waypoint(BaseModel):
     """Um ponto da rota do cavebot.
 
-    `x`/`y` são coords de FRAME (mesmo espaço das regiões calibradas; sob OBS são
-    coords de canvas, convertidas p/ desktop em runtime). Para `ir` o ponto é no
-    minimapa; para `andar_em`/`usar` é no game-world.
+    Para `ir` (clique no minimapa): `x`/`y` são **offsets em relação ao centro do
+    minimapa calibrado** (positivo = leste/sul, negativo = oeste/norte). O centro
+    representa sempre a posição atual do personagem, então o clique aponta ao mesmo
+    deslocamento in-game independente de onde o personagem esteja. O zoom deve ser
+    mantido igual ao da gravação.
+
+    Para `andar_em`/`usar` (game-world): `x`/`y` são coords absolutas de FRAME
+    (mesmo espaço das regiões calibradas; sob OBS são coords de canvas, convertidas
+    p/ desktop em runtime).
     """
 
     tipo: str = "ir"          # ir | andar_em | usar | tecla | esperar

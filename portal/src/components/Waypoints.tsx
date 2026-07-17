@@ -41,9 +41,11 @@ const TIPOS_TROCA: WaypointTipo[] = ["andar_em", "usar", "tecla"]
 export function Waypoints({
   waypoints,
   onChange,
+  minimapRegiao,
 }: {
   waypoints: Waypoint[]
   onChange: (wps: Waypoint[]) => void
+  minimapRegiao?: [number, number, number, number] | null
 }) {
   const [aberto, setAberto] = useState(false)
 
@@ -72,7 +74,7 @@ export function Waypoints({
               <Plus /> Gravar waypoint
             </Button>
           </DialogTrigger>
-          <GravarWaypoint onAdicionar={adicionar} />
+          <GravarWaypoint onAdicionar={adicionar} minimapRegiao={minimapRegiao} />
         </Dialog>
       </div>
 
@@ -91,7 +93,9 @@ export function Waypoints({
                 {wp.nome || "(sem nome)"}
                 {TIPOS_PONTO.includes(wp.tipo) && (
                   <span className="ml-2 text-xs text-muted-foreground tabular-nums">
-                    ({wp.x}, {wp.y})
+                    {wp.tipo === "ir"
+                      ? `(${wp.x >= 0 ? "+" : ""}${wp.x}, ${wp.y >= 0 ? "+" : ""}${wp.y}) offset`
+                      : `(${wp.x}, ${wp.y})`}
                   </span>
                 )}
                 {wp.tipo === "tecla" && <span className="ml-2 text-xs text-muted-foreground">[{wp.tecla}]</span>}
@@ -115,7 +119,13 @@ export function Waypoints({
 }
 
 /** Diálogo: grava um waypoint. Para tipos com ponto, captura um frame e o usuário CLICA o alvo. */
-function GravarWaypoint({ onAdicionar }: { onAdicionar: (wp: Waypoint) => void }) {
+function GravarWaypoint({
+  onAdicionar,
+  minimapRegiao,
+}: {
+  onAdicionar: (wp: Waypoint) => void
+  minimapRegiao?: [number, number, number, number] | null
+}) {
   const [tipo, setTipo] = useState<WaypointTipo>("ir")
   const [nome, setNome] = useState("")
   const [tecla, setTecla] = useState("f9")
@@ -166,11 +176,23 @@ function GravarWaypoint({ onAdicionar }: { onAdicionar: (wp: Waypoint) => void }
       toast.error("Informe a tecla (hotkey bindada no Tibia).")
       return
     }
+    let x = ponto?.x ?? 0
+    let y = ponto?.y ?? 0
+    // waypoints "ir" armazenam offset relativo ao centro do minimapa, não coord absoluta.
+    // O centro é fixo na tela (painel do minimapa não se move) e representa sempre a
+    // posição atual do personagem — assim o clique aponta ao mesmo deslocamento in-game
+    // independente de onde o personagem esteja ao executar a rota.
+    if (tipo === "ir" && minimapRegiao) {
+      const cx = Math.round((minimapRegiao[0] + minimapRegiao[2]) / 2)
+      const cy = Math.round((minimapRegiao[1] + minimapRegiao[3]) / 2)
+      x = x - cx
+      y = y - cy
+    }
     onAdicionar({
       tipo,
       nome: nome.trim(),
-      x: ponto?.x ?? 0,
-      y: ponto?.y ?? 0,
+      x,
+      y,
       tecla: tipo === "tecla" ? tecla.trim() : null,
       dwell_s: dwell,
       troca_andar: podeTrocarAndar && trocaAndar,
@@ -182,10 +204,11 @@ function GravarWaypoint({ onAdicionar }: { onAdicionar: (wp: Waypoint) => void }
       <DialogHeader>
         <DialogTitle>Gravar waypoint</DialogTitle>
         <DialogDescription>
-          <span className="font-medium">Ir</span>: clique no minimapa (o Tibia anda o trecho; a chegada é
-          detectada quando o minimapa para de rolar). <span className="font-medium">Pisar/Usar</span>: clique no
-          tile/objeto no game-world para trocar de andar. <span className="font-medium">Tecla</span>: dispara uma
-          hotkey (ex.: corda/pá).
+          <span className="font-medium">Ir</span>: clique no minimapa — grava um offset relativo ao centro
+          (= posição do personagem), então o clique aponta ao mesmo deslocamento in-game em qualquer volta
+          da rota. Mantenha o zoom do minimapa igual ao da gravação.{" "}
+          <span className="font-medium">Pisar/Usar</span>: clique no tile/objeto no game-world para trocar
+          de andar. <span className="font-medium">Tecla</span>: dispara uma hotkey (ex.: corda/pá).
         </DialogDescription>
       </DialogHeader>
 
@@ -224,7 +247,9 @@ function GravarWaypoint({ onAdicionar }: { onAdicionar: (wp: Waypoint) => void }
               {carregando ? <Loader2 className="animate-spin" /> : <Camera />} Capturar frame
             </Button>
             <span className="text-xs text-muted-foreground">
-              {tipo === "ir" ? "Clique no MINIMAPA onde o bot deve ir." : "Clique no TILE/objeto no game-world."}
+              {tipo === "ir"
+                ? "Clique no MINIMAPA onde o bot deve ir (gravado como offset relativo ao centro)."
+                : "Clique no TILE/objeto no game-world."}
             </span>
           </div>
           {frame && (

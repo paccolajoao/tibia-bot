@@ -39,7 +39,7 @@ def _portal_buildado() -> bool:
     return (DIR_PORTAL / "index.html").is_file()
 
 
-def criar_app(barramento, controlador: ControladorExecucao) -> FastAPI:
+def criar_app(barramento, controlador: ControladorExecucao, loop=None) -> FastAPI:
     clientes: set[WebSocket] = set()
 
     @asynccontextmanager
@@ -54,7 +54,7 @@ def criar_app(barramento, controlador: ControladorExecucao) -> FastAPI:
             tarefa.cancel()
 
     app = FastAPI(title="Bot Tibia — Portal", lifespan=lifespan)
-    app.include_router(criar_router_api(barramento))
+    app.include_router(criar_router_api(barramento, loop))
 
     @app.websocket("/ws")
     async def ws(websocket: WebSocket):

@@ -73,7 +73,7 @@ def _resumo(p: repo.Perfil) -> dict:
     }
 
 
-def criar_router_api(barramento=None) -> APIRouter:
+def criar_router_api(barramento=None, loop=None) -> APIRouter:
     repo.garantir_inicializado()  # cria o esquema + semeia o perfil "Padrão" se vazio
     r = APIRouter(prefix="/api")
 
@@ -206,11 +206,22 @@ def criar_router_api(barramento=None) -> APIRouter:
     # ----- calibração: captura um frame para desenhar as regiões -----
     @r.post("/calibracao/frame")
     def calibracao_frame():
-        from bot.captura.instantaneo import capturar_frame_calibracao, codificar_jpeg
+        from bot.captura.instantaneo import (
+            capturar_frame_calibracao,
+            codificar_jpeg,
+            frame_de_capturador,
+        )
 
         cfg = repo.carregar_config_ativa()
+        # Se o bot já está rodando, reaproveita o frame do capturador ativo: abrir um
+        # 2º handle do mesmo device (sobretudo a OBS Virtual Camera) derruba a captura
+        # do bot (cv2.error "Unknown C++ exception" no read() da thread do loop).
+        cap_vivo = getattr(loop, "cap", None) if (loop is not None and loop.is_alive()) else None
         try:
-            frame = capturar_frame_calibracao(cfg)
+            if cap_vivo is not None:
+                frame = frame_de_capturador(cap_vivo)
+            else:
+                frame = capturar_frame_calibracao(cfg)
         except Exception as e:
             raise HTTPException(500, f"Falha na captura: {e}") from e
         if frame is None:

@@ -111,7 +111,15 @@ class CapturadorOBS:
 
     def _loop_leitura(self) -> None:
         while self._rodando and self._cap is not None:
-            ok, frame = self._cap.read()
+            # `read()` pode levantar (cv2.error "Unknown C++ exception") se o device
+            # for aberto por outro consumidor (ex.: calibração abrindo um 2º handle) ou
+            # se a Virtual Camera for parada no OBS. Engolimos para a thread NUNCA morrer
+            # — senão a captura do bot fica morta sem o loop perceber.
+            try:
+                ok, frame = self._cap.read()
+            except Exception:
+                time.sleep(0.05)
+                continue
             if not ok or frame is None:
                 time.sleep(0.005)
                 continue

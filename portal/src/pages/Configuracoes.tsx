@@ -323,7 +323,11 @@ export function Configuracoes() {
             <CampoNumero label="Timeout de combate" sufixo="s" step={1} min={0} valor={v("cavebot.combate_timeout_s")} onChange={(x) => set("cavebot.combate_timeout_s", x)} dica="Se há criatura mas nenhuma morte por este tempo (bicho inalcançável), volta a andar em vez de travar. 0 = nunca desiste." />
             <CampoNumero label="Limiar de troca de andar" step={1} min={0} valor={v("cavebot.limiar_troca_andar")} onChange={(x) => set("cavebot.limiar_troca_andar", x)} dica="Pico de mudança do minimapa que confirma escada/buraco/corda. Baixe se trocas não forem detectadas." />
             <CampoNumero label="Tentativas de troca" step={1} min={1} valor={v("cavebot.tentativas_troca")} onChange={(x) => set("cavebot.tentativas_troca", x)} dica="Re-tentativas de um waypoint 'muda de andar' antes de seguir (best-effort, não trava)." />
-            <Waypoints waypoints={(v("cavebot.waypoints") ?? []) as Waypoint[]} onChange={(wps) => set("cavebot.waypoints", wps)} />
+            <Waypoints
+              waypoints={(v("cavebot.waypoints") ?? []) as Waypoint[]}
+              onChange={(wps) => set("cavebot.waypoints", wps)}
+              minimapRegiao={cfg.regioes.minimap as [number, number, number, number]}
+            />
           </Secao>
         </TabsContent>
 

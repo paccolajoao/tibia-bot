@@ -14,8 +14,12 @@ Como tarefa de movimento, **cede ao combate** — mas com um *watchdog*: se há 
 nenhuma morte por `combate_timeout_s` (bicho inalcançável), volta a andar em vez de ceder
 para sempre. Prioridade baixa por garantia.
 
-Coordenadas dos waypoints estão em coords de FRAME/canvas; a flag `dados['transformar']`
-faz o loop aplicar o mapeamento OBS->desktop no clique em runtime (ver loop_bot.py).
+Coordenadas de waypoints `ir` são **offsets em relação ao centro do minimapa** (dx, dy):
+o centro é sempre a posição atual do personagem, então o clique sempre aponta ao mesmo
+deslocamento in-game independente de onde o personagem esteja. A flag `dados['relativo_centro']`
+sinaliza ao loop que deve somar o centro antes de clicar (ver loop_bot.py). Waypoints
+`andar_em`/`usar` continuam usando coords absolutas de FRAME/canvas. A flag
+`dados['transformar']` faz o loop aplicar o mapeamento OBS->desktop em runtime.
 
 A transição "cliquei e estou esperando" só acontece quando a ação REALMENTE executa: o
 loop carimba `cavebot_acao_ts` após executar uma ação do cavebot (como faz com o alvo).
@@ -207,16 +211,23 @@ class Cavebot:
             )
 
         # "ir" (minimapa) e "andar_em" (tile do game-world) = clique esquerdo
-        motivo = (
-            f"cavebot {rotulo}: andar no minimapa"
-            if wp.tipo == "ir"
-            else f"cavebot {rotulo}: pisar no tile (troca de andar){sufixo}"
-        )
+        if wp.tipo == "ir":
+            # wp.x/wp.y são offset relativo ao centro do minimapa; o loop soma o centro.
+            return Decisao(
+                self.nome,
+                TipoAcao.CLICAR,
+                tecla=None,
+                motivo=f"cavebot {rotulo}: andar no minimapa",
+                prioridade=self.prioridade,
+                dados={**base_dados, "transformar": True, "relativo_centro": True},
+                ponto=(wp.x, wp.y),
+                chave_cooldown=CHAVE_COOLDOWN,
+            )
         return Decisao(
             self.nome,
             TipoAcao.CLICAR,
             tecla=None,
-            motivo=motivo,
+            motivo=f"cavebot {rotulo}: pisar no tile (troca de andar){sufixo}",
             prioridade=self.prioridade,
             dados={**base_dados, "transformar": True},
             ponto=(wp.x, wp.y),

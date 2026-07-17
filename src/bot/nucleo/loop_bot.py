@@ -119,6 +119,8 @@ class LoopBot(threading.Thread):
         # cavebot: observa o minimapa p/ detectar "andando" (chegada = parou de rolar)
         self._minimap_ativo = cfg.cavebot.ativo and cfg.regioes.minimap_calibrado
         self._reg_minimap = tuple(cfg.regioes.minimap) if self._minimap_ativo else None
+        _ml, _mt, _mr, _mb = cfg.regioes.minimap
+        self._minimap_centro: tuple[int, int] = ((_ml + _mr) // 2, (_mt + _mb) // 2)
         self._limiar_movimento_minimap = cfg.cavebot.limiar_movimento
         self._minimap_anterior = None
         self._periodo = 1.0 / max(1.0, cfg.captura.fps_alvo)
@@ -390,8 +392,16 @@ class LoopBot(threading.Thread):
         """Coords finais do clique. Decisões com `dados['transformar']` (cavebot)
         carregam coords de FRAME/canvas e precisam do mapeamento OBS->desktop em
         runtime; as demais (alvo/drop) já vêm pré-transformadas pelo detector.
+
+        Waypoints "ir" do cavebot trazem `dados['relativo_centro']=True` e `ponto`
+        como offset (dx,dy) em relação ao centro do minimapa — somamos o centro aqui
+        antes da transformação OBS, para que o clique final aponte sempre ao mesmo
+        deslocamento in-game a partir da posição atual do personagem.
         """
         ponto = dec.ponto
+        if dec.dados.get("relativo_centro"):
+            cx, cy = self._minimap_centro
+            ponto = (cx + ponto[0], cy + ponto[1])
         if dec.dados.get("transformar") and self._transformar_clique is not None:
             ponto = self._transformar_clique(*ponto)
         return ponto

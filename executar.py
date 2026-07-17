@@ -153,7 +153,7 @@ def main() -> int:
     else:
         log("Regiões de HP/Mana não calibradas — abra o portal e calibre, depois reinicie o bot.", "alerta")
 
-    app = criar_app(barramento, controlador)
+    app = criar_app(barramento, controlador, loop)
     print(f"\nPortal ao vivo: http://{cfg.painel.host}:{cfg.painel.port}\n")
 
     import uvicorn
