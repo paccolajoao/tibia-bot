@@ -275,9 +275,41 @@ class MagiaAtaqueConfig(BaseModel):
     prioridade: int = 70           # abaixo de cura(100)/saque(85)/alvo(80); acima de drop(50)
 
 
+class ArduinoConfig(BaseModel):
+    """Board HID dedicado (ATmega32u4: Leonardo/Micro/Pro Micro) rodando o firmware
+    `arduino/entrada_hid/entrada_hid.ino` — NÃO é a BlackBoard (ATmega328P sem USB
+    nativo: não tem como virar teclado/mouse HID). O bot fala serial (USB) com o
+    board, que emite teclado/mouse HID de verdade — o Windows não distingue de um
+    teclado/mouse físico.
+    """
+
+    porta: str = "COM3"
+    baud_rate: int = 115200
+    # timeout de leitura do ACK — limita quanto um tick pode travar esperando o board
+    # responder (nunca bloqueia indefinidamente; ver entrada/teclado_arduino.py).
+    timeout_s: float = Field(default=1.0, ge=0.05)
+    # 0 = auto-detecta a resolução do monitor PRIMÁRIO (GetSystemMetrics). O mouse
+    # absoluto via HID só alcança o monitor primário do Windows — se o Tibia rodar
+    # num monitor secundário, os cliques do Arduino vão errar/grudar na borda.
+    largura_tela: int = 0
+    altura_tela: int = 0
+
+
 class EntradaConfig(BaseModel):
+    backend: str = "directinput"  # directinput (SendInput) | arduino (HID de hardware)
     atraso_pre_ms: tuple[int, int] = (40, 90)
     atraso_pos_ms: tuple[int, int] = (30, 70)
+    # Atraso de "reação humana" (tempo p/ notar e decidir) aplicado UMA vez antes de
+    # qualquer ação executada — camada distinta do jitter pré/pós acima, que fica
+    # dentro do backend, ao redor do movimento/clique em si. Fica OFF (0,0) por
+    # padrão para não deixar os testes de integração do loop lentos/não-determinísticos
+    # (ver entrada/atrasos.py:atraso_humano); ligue pela aba Sistema do portal.
+    atraso_reacao_ms: tuple[int, int] = (0, 0)
+    # Exceção: cura_forte e poção de vida (as 2 camadas de cura mais urgentes, ver
+    # decisao/comportamentos/camada_cura.py) usam esta faixa curta em vez da de cima —
+    # não vale a pena "reagir devagar" a um pânico de HP.
+    atraso_reacao_critico_ms: tuple[int, int] = (0, 0)
+    arduino: ArduinoConfig = Field(default_factory=ArduinoConfig)
 
 
 class SegurancaConfig(BaseModel):

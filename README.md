@@ -231,7 +231,7 @@ src/bot/
   visao/      barra_recursos · estabilizador · lista_batalha · inventario · minimap · anotador · tipos
   decisao/    motor · cooldown · comportamentos/(camada_cura, alvo, comer, saque, drop, usar_mana, magia_ataque, cavebot)
   telemetria/ eventos · barramento · estatisticas
-  entrada/    teclado_directinput · atrasos · simulada
+  entrada/    teclado_directinput · teclado_arduino · fabrica · atrasos · simulada
   nucleo/     loop_bot · estado_execucao · seguranca
   persistencia/ banco · repo_perfis        # SQLite: perfis + config (fonte única)
   painel/     servidor · api · ponte · web/(painel legado)
@@ -348,6 +348,29 @@ o clique de targeting é convertido para a tela em runtime lendo a **posição v
 Tibia** (mover a janela não exige recalibrar). Com `backend: obs`, o auto-fallback para `mss` fica
 desativado (mss vem preto no Tibia). Se o canvas **não** ficou 1:1, o bot ainda aplica a escala —
 mas o 1:1 deixa o clique mais exato.
+
+## Entrada via Arduino (HID de hardware, opcional/avançado)
+
+Por padrão o bot manda teclas/cliques via `SendInput` (Windows). Como alternativa,
+`entrada.backend: arduino` troca isso por um Arduino dedicado que emite teclado/mouse
+**HID de verdade** — o Windows não distingue de hardware físico, o que ajuda tanto
+quando o cliente do Tibia roda **elevado** (SendInput de um processo não-elevado pode
+não chegar lá; HID de hardware chega igual) quanto contra checagens que detectam
+input sintético.
+
+**Precisa de um board com USB nativo** (ATmega32u4: Arduino Leonardo/Micro/Pro
+Micro). A RoboCore BlackBoard (qualquer versão) **não serve** — é um clone de Uno
+(ATmega328P + conversor USB-serial fixo), sem USB nativo, incapaz de virar HID por
+firmware algum. Veja **[`arduino/README.md`](arduino/README.md)** para gravar o
+firmware de referência (`arduino/entrada_hid/entrada_hid.ino`) e as instruções
+completas — inclui uma limitação importante do Windows (mouse absoluto via HID só
+alcança o **monitor primário**).
+
+Depois de gravado, configure em **Configurações → Sistema → Entrada**: escolha o
+backend `Arduino` e a porta serial. Essa mesma aba também tem o **atraso de reação
+humana** (pausa aleatória, configurável em ms, antes de cada ação — com uma faixa
+curta separada para curas críticas, que não devem esperar); funciona com qualquer um
+dos dois backends, não só o Arduino.
 
 ## Troubleshooting
 

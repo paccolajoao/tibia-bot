@@ -18,6 +18,7 @@ Rotas (montadas sob `/api`):
   GET    /config/export          baixa o config ativo como YAML
   POST   /config/importar        cria perfil a partir de YAML {nome, yaml}
   GET    /meta                   opções p/ a UI (backends, defaults) + estado
+  POST   /entrada/arduino/testar teste rápido do board Arduino HID (não salva nada)
   POST   /calibracao/frame       captura um frame (JPEG base64) p/ desenhar regiões
 """
 
@@ -58,6 +59,28 @@ class Regioes(BaseModel):
 class ImportarYaml(BaseModel):
     nome: str
     yaml: str
+
+
+class TesteArduinoBody(BaseModel):
+    """Config a testar — vem do formulário (mesmo sem ter sido salva ainda)."""
+
+    porta: str
+    baud_rate: int = 115200
+    timeout_s: float = 1.0
+    largura_tela: int = 0
+    altura_tela: int = 0
+    testar_clique: bool = False  # opt-in: clica de verdade em ponto_clique (ver aba Arduino)
+    ponto_clique: tuple[int, int] | None = None
+
+
+def _listar_portas_seriais() -> list[str]:
+    """Portas COM disponíveis (p/ a aba Sistema sugerir ao configurar o backend arduino)."""
+    try:
+        from serial.tools import list_ports
+
+        return [p.device for p in list_ports.comports()]
+    except Exception:
+        return []
 
 
 def _resumo(p: repo.Perfil) -> dict:
@@ -198,10 +221,28 @@ def criar_router_api(barramento=None, loop=None) -> APIRouter:
         snap = barramento.ultimo_snapshot() if barramento is not None else None
         return {
             "backends_captura": ["auto", "bettercam", "wgc", "mss", "obs", "tibia_arquivo"],
+            "portas_seriais": _listar_portas_seriais(),
             "perfil_ativo": _resumo(ativo),
             "bot_rodando": snap is not None,
             "estado": snap.to_dict() if snap is not None else None,
         }
+
+    # ----- entrada: teste rápido do board Arduino (aba Arduino) -----
+    @r.post("/entrada/arduino/testar")
+    def testar_arduino(body: TesteArduinoBody):
+        from bot.entrada.teclado_arduino import executar_diagnostico
+
+        if not body.porta.strip():
+            raise HTTPException(422, "Informe a porta serial (ex.: COM5) antes de testar.")
+        return executar_diagnostico(
+            body.porta,
+            body.baud_rate,
+            body.timeout_s,
+            body.largura_tela,
+            body.altura_tela,
+            testar_clique=body.testar_clique,
+            ponto_clique=body.ponto_clique,
+        )
 
     # ----- calibração: captura um frame para desenhar as regiões -----
     @r.post("/calibracao/frame")

@@ -35,7 +35,7 @@ from bot.decisao.comportamentos.usar_mana import (
 from bot.decisao.comportamentos.usar_mana import UsarMana  # noqa: E402
 from bot.decisao.cooldown import GerenciadorCooldown  # noqa: E402
 from bot.decisao.motor import MotorDecisao  # noqa: E402
-from bot.entrada.teclado_directinput import EntradaDirectInput  # noqa: E402
+from bot.entrada.fabrica import criar_entrada  # noqa: E402
 from bot.nucleo.estado_execucao import ControladorExecucao, EstadoExecucao  # noqa: E402
 from bot.nucleo.loop_bot import LoopBot  # noqa: E402
 from bot.nucleo.seguranca import Seguranca  # noqa: E402
@@ -59,7 +59,10 @@ def _montar_loop(cfg, controlador, barramento, log) -> LoopBot:
         obs_largura=cfg.captura.obs_largura,
         obs_altura=cfg.captura.obs_altura,
     )
-    entrada = EntradaDirectInput(cfg.entrada.atraso_pre_ms, cfg.entrada.atraso_pos_ms)
+    entrada = criar_entrada(
+        cfg.entrada.backend, cfg.entrada.atraso_pre_ms, cfg.entrada.atraso_pos_ms,
+        log, arduino=cfg.entrada.arduino,
+    )
     # cooldown do usar-mana é chaveado pela CHAVE_COOLDOWN da Decisao ("usar_mana"),
     # não pela tecla — senão o motor consulta uma chave que não existe no gerenciador.
     usar_mana_cd = {CHAVE_COOLDOWN_USAR_MANA: cfg.usar_mana.cooldown_s} if cfg.usar_mana.ativo else {}

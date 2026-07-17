@@ -108,7 +108,42 @@ def test_export_importar_yaml(client):
     assert novo.status_code == 201
 
 
+def test_testar_arduino_porta_inexistente_retorna_diagnostico_falho(client):
+    # sem hardware: porta inexistente falha ao abrir, mas o endpoint responde 200 com
+    # um relatório (não 500) — é a UI da aba Arduino que renderiza o "conectar: falhou".
+    r = client.post("/api/entrada/arduino/testar", json={"porta": "COM999", "timeout_s": 0.05})
+    assert r.status_code == 200
+    corpo = r.json()
+    assert corpo["sucesso"] is False
+    assert corpo["etapas"][0]["nome"] == "conectar"
+    assert corpo["etapas"][0]["ok"] is False
+
+
+def test_testar_arduino_porta_vazia_e_rejeitada(client):
+    r = client.post("/api/entrada/arduino/testar", json={"porta": "   "})
+    assert r.status_code == 422
+
+
 def test_meta(client):
     meta = client.get("/api/meta").json()
     assert "obs" in meta["backends_captura"]
+    assert isinstance(meta["portas_seriais"], list)
     assert meta["perfil_ativo"]["ativo"]
+
+
+def test_config_entrada_arduino_roundtrip(client):
+    """Prova que o backend/porta/atrasos de reação do Arduino passam pelo portal (API)."""
+    cfg = client.get("/api/config").json()
+    entrada = cfg["entrada"]
+    for campo in ("backend", "atraso_reacao_ms", "atraso_reacao_critico_ms", "arduino"):
+        assert campo in entrada, campo
+    entrada["backend"] = "arduino"
+    entrada["atraso_reacao_ms"] = [100, 1500]
+    entrada["atraso_reacao_critico_ms"] = [0, 50]
+    entrada["arduino"]["porta"] = "COM7"
+    entrada["arduino"]["baud_rate"] = 115200
+    assert client.put("/api/config", json=cfg).status_code == 200
+    salvo = client.get("/api/config").json()["entrada"]
+    assert salvo["backend"] == "arduino"
+    assert salvo["atraso_reacao_ms"] == [100, 1500]
+    assert salvo["arduino"]["porta"] == "COM7"

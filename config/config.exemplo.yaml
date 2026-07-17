@@ -83,8 +83,14 @@ saque:                    # auto-loot via Quick Loot do Tibia (só com battle li
   prioridade: 60          # abaixo de alvo (80), acima de comer (10)
 
 entrada:
+  backend: directinput      # directinput (SendInput) | arduino (HID de hardware — veja arduino/README.md)
   atraso_pre_ms: [40, 90]   # jitter humano antes de apertar a tecla
   atraso_pos_ms: [30, 70]   # jitter humano depois
+  atraso_reacao_ms: [0, 0]        # atraso de "reação humana" antes de cada ação; 0,0 = desligado
+  atraso_reacao_critico_ms: [0, 0]  # idem, mas p/ cura_forte/poção de vida (deixe curto/zero)
+  arduino:                  # só usado com backend: arduino
+    porta: COM3
+    baud_rate: 115200
 
 seguranca:
   hotkey_pausar: f11        # pausa/retoma (hotkey global; requer admin)

@@ -142,9 +142,21 @@ export interface MagiaAtaqueConfig {
   prioridade: number
 }
 
+export interface ArduinoConfig {
+  porta: string
+  baud_rate: number
+  timeout_s: number
+  largura_tela: number
+  altura_tela: number
+}
+
 export interface EntradaConfig {
+  backend: string
   atraso_pre_ms: [number, number]
   atraso_pos_ms: [number, number]
+  atraso_reacao_ms: [number, number]
+  atraso_reacao_critico_ms: [number, number]
+  arduino: ArduinoConfig
 }
 
 export interface SegurancaConfig {
@@ -188,9 +200,34 @@ export interface PerfilResumo {
 
 export interface Meta {
   backends_captura: string[]
+  portas_seriais: string[]
   perfil_ativo: PerfilResumo
   bot_rodando: boolean
   estado: TelemetriaEstado | null
+}
+
+export interface TesteArduinoBody {
+  porta: string
+  baud_rate: number
+  timeout_s: number
+  largura_tela: number
+  altura_tela: number
+  testar_clique: boolean
+  ponto_clique: [number, number] | null
+}
+
+export interface EtapaTesteArduino {
+  nome: "conectar" | "ping" | "teclado" | "mouse_movimento" | "mouse_clique"
+  ok: boolean
+  latencia_ms: number | null
+  detalhe: string | null
+}
+
+export interface TesteArduinoResultado {
+  sucesso: boolean
+  etapas: EtapaTesteArduino[]
+  largura_usada: number
+  altura_usada: number
 }
 
 export interface FrameCalibracao {

@@ -16,6 +16,10 @@ pygrabber>=0.2 ; sys_platform == "win32"
 # Simulação de input (SendInput; funciona em jogos DirectX onde pyautogui falha)
 pydirectinput-rgx>=2.1.0
 
+# Entrada via Arduino HID (backend entrada.backend=arduino — board ATmega32u4
+# dedicado rodando arduino/entrada_hid/entrada_hid.ino; NÃO a BlackBoard)
+pyserial>=3.5
+
 # Dashboard web (uvicorn[standard] já traz websockets/httptools)
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0

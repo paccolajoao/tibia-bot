@@ -17,6 +17,7 @@ import cv2
 
 from bot.captura.base import Regiao
 from bot.decisao.tipos import Decisao, TipoAcao
+from bot.entrada.atrasos import atraso_humano, faixa_atraso_reacao
 from bot.nucleo.estado_execucao import ControladorExecucao, EstadoExecucao
 from bot.telemetria import eventos as ev
 from bot.visao.anotador import desenhar_overlay
@@ -276,9 +277,14 @@ class LoopBot(threading.Thread):
         self._detectar_minimap()
 
         dec = self.motor.decidir(self.ctx, t0)
+        # atraso de "reação humana": UMA vez, antes de despachar, só quando algo vai
+        # realmente ser executado (senão atrasaria à toa a leitura de HP do próximo
+        # tick). Curas críticas (cura_forte/poção de vida) usam a faixa curta.
+        if self.ctx.janela_focada and dec.acao != TipoAcao.NENHUMA:
+            atraso_humano(faixa_atraso_reacao(dec.dados, cfg.entrada.atraso_reacao_ms, cfg.entrada.atraso_reacao_critico_ms))
         executou = False
         if not self.ctx.janela_focada:
-            pass  # sem foco: decide e exibe, mas não envia input (SendInput exige foco)
+            pass  # a janela precisa estar em foco p/ o SO entregar o input, seja SendInput ou HID de hardware
         elif dec.acao == TipoAcao.PRESSIONAR_TECLA and dec.tecla:
             self.entrada.pressionar_tecla(dec.tecla)
             executou = True

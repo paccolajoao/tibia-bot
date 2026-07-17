@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Save, RotateCcw, Loader2, AlertTriangle } from "lucide-react"
+import { Save, RotateCcw, Loader2, AlertTriangle, CheckCircle2, XCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampoNumero, CampoSelect, CampoSwitch, CampoTecla, CampoTexto } from "@/components/campos"
 import { DropItens } from "@/components/DropItens"
 import { Waypoints } from "@/components/Waypoints"
+import { TesteArduino } from "@/components/TesteArduino"
 import { useTelemetria } from "@/hooks/useTelemetria"
 import { api } from "@/lib/api"
 import type { Config, ItemDrop, Meta, Regiao, Waypoint } from "@/lib/types"
@@ -57,6 +58,19 @@ function LinhaRecurso({
         )}
       </div>
       <Switch checked={ativo} onCheckedChange={onChange} />
+    </div>
+  )
+}
+
+function LinhaChecklist({ ok, texto }: { ok: boolean; texto: string }) {
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      {ok ? (
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+      ) : (
+        <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+      )}
+      <span className={ok ? "text-foreground" : "text-muted-foreground"}>{texto}</span>
     </div>
   )
 }
@@ -132,6 +146,11 @@ export function Configuracoes() {
     regiaoCalibrada(cfg.regioes.minimap) && (cfg.cavebot.waypoints?.length ?? 0) >= 1
   const manaAoVivo = tele.estado?.mana_pct
 
+  // status da aba Arduino
+  const backendArduino = cfg.entrada.backend === "arduino"
+  const arduinoPortaPreenchida = !!cfg.entrada.arduino.porta?.trim()
+  const arduinoPortaDetectada = !!meta?.portas_seriais?.includes(cfg.entrada.arduino.porta)
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -164,6 +183,7 @@ export function Configuracoes() {
           <TabsTrigger value="mana">Usar Mana</TabsTrigger>
           <TabsTrigger value="captura">Captura</TabsTrigger>
           <TabsTrigger value="visao">Visão</TabsTrigger>
+          <TabsTrigger value="arduino">Arduino</TabsTrigger>
           <TabsTrigger value="sistema">Sistema</TabsTrigger>
         </TabsList>
 
@@ -390,12 +410,95 @@ export function Configuracoes() {
           </Secao>
         </TabsContent>
 
+        <TabsContent value="arduino" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Status</CardTitle>
+              <CardDescription>Checklist antes de rodar o bot com entrada via Arduino.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-2">
+              <LinhaChecklist
+                ok={backendArduino}
+                texto="Backend de entrada = Arduino (senão o bot usa o SendInput do Windows normalmente, mesmo com o resto configurado)."
+              />
+              <LinhaChecklist ok={arduinoPortaPreenchida} texto="Porta serial preenchida." />
+              <LinhaChecklist
+                ok={arduinoPortaDetectada}
+                texto={
+                  arduinoPortaDetectada
+                    ? "Porta detectada agora pelo sistema."
+                    : `Porta NÃO detectada agora — confira se o board está plugado e ligado. ${
+                        meta?.portas_seriais && meta.portas_seriais.length > 0
+                          ? `Detectadas: ${meta.portas_seriais.join(", ")}.`
+                          : "Nenhuma porta serial detectada no momento."
+                      }`
+                }
+              />
+            </CardContent>
+          </Card>
+
+          <Secao
+            titulo="Configuração"
+            descricao="Precisa de um board com USB nativo (Arduino Leonardo/Micro/Pro Micro — ATmega32u4) gravado com arduino/entrada_hid/entrada_hid.ino. A RoboCore BlackBoard NÃO serve: não tem USB nativo, não vira teclado/mouse HID."
+          >
+            <CampoSelect
+              label="Backend de entrada"
+              valor={v("entrada.backend")}
+              onChange={(x) => set("entrada.backend", x)}
+              opcoes={[
+                { valor: "directinput", rotulo: "Windows (SendInput)" },
+                { valor: "arduino", rotulo: "Arduino (HID de hardware)" },
+              ]}
+            />
+            <div className="hidden sm:block" />
+            <CampoTexto
+              label="Porta serial"
+              placeholder="ex.: COM5"
+              dica={
+                meta?.portas_seriais && meta.portas_seriais.length > 0
+                  ? `Portas detectadas agora: ${meta.portas_seriais.join(", ")}`
+                  : "Nenhuma porta detectada agora — confira se o board está plugado."
+              }
+              valor={v("entrada.arduino.porta")}
+              onChange={(x) => set("entrada.arduino.porta", x)}
+            />
+            <CampoNumero label="Baud rate" step={1} min={0} valor={v("entrada.arduino.baud_rate")} onChange={(x) => set("entrada.arduino.baud_rate", x)} />
+            <CampoNumero label="Timeout de resposta" sufixo="s" step={0.1} min={0.05} valor={v("entrada.arduino.timeout_s")} onChange={(x) => set("entrada.arduino.timeout_s", x)} dica="Quanto esperar pelo ACK do board antes de desistir do comando." />
+            <div className="hidden sm:block" />
+            <CampoNumero label="Largura da tela" step={1} min={0} valor={v("entrada.arduino.largura_tela")} onChange={(x) => set("entrada.arduino.largura_tela", x)} dica="0 = auto-detecta o monitor primário. O mouse do Arduino só alcança o monitor primário do Windows." />
+            <CampoNumero label="Altura da tela" step={1} min={0} valor={v("entrada.arduino.altura_tela")} onChange={(x) => set("entrada.arduino.altura_tela", x)} dica="0 = auto-detecta o monitor primário." />
+          </Secao>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Teste rápido</CardTitle>
+              <CardDescription>
+                Usa a configuração acima como está digitada — não precisa clicar em Salvar antes. Se o bot já
+                estiver rodando com o backend Arduino, pare-o antes de testar (só um processo pode abrir a
+                porta serial por vez).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TesteArduino arduino={cfg.entrada.arduino} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="sistema" className="space-y-6">
-          <Secao titulo="Entrada (humanização)" descricao="Atrasos aleatórios antes/depois de cada input (ms).">
+          <Secao titulo="Entrada (humanização)" descricao="Atrasos aleatórios antes/depois de cada input (ms) — jitter fino, dentro do backend escolhido na aba Arduino.">
             <CampoNumero label="Pré — mín." sufixo="ms" valor={v("entrada.atraso_pre_ms.0")} onChange={(x) => set("entrada.atraso_pre_ms.0", x)} />
             <CampoNumero label="Pré — máx." sufixo="ms" valor={v("entrada.atraso_pre_ms.1")} onChange={(x) => set("entrada.atraso_pre_ms.1", x)} />
             <CampoNumero label="Pós — mín." sufixo="ms" valor={v("entrada.atraso_pos_ms.0")} onChange={(x) => set("entrada.atraso_pos_ms.0", x)} />
             <CampoNumero label="Pós — máx." sufixo="ms" valor={v("entrada.atraso_pos_ms.1")} onChange={(x) => set("entrada.atraso_pos_ms.1", x)} />
+          </Secao>
+          <Secao
+            titulo="Atraso de reação humana"
+            descricao="Pausa ÚNICA antes de despachar cada ação (tempo de 'notar e decidir'), somada ao jitter acima. Cura crítica (cura forte/poção de vida) usa a faixa curta — evita atrasar uma emergência de HP. Fica desligado (0/0) até você preencher aqui."
+          >
+            <CampoNumero label="Reação — mín." sufixo="ms" step={10} min={0} valor={v("entrada.atraso_reacao_ms.0")} onChange={(x) => set("entrada.atraso_reacao_ms.0", x)} />
+            <CampoNumero label="Reação — máx." sufixo="ms" step={10} min={0} valor={v("entrada.atraso_reacao_ms.1")} onChange={(x) => set("entrada.atraso_reacao_ms.1", x)} dica="Sugestão: 100–1500ms para simular reação humana." />
+            <CampoNumero label="Reação (cura crítica) — mín." sufixo="ms" step={10} min={0} valor={v("entrada.atraso_reacao_critico_ms.0")} onChange={(x) => set("entrada.atraso_reacao_critico_ms.0", x)} />
+            <CampoNumero label="Reação (cura crítica) — máx." sufixo="ms" step={10} min={0} valor={v("entrada.atraso_reacao_critico_ms.1")} onChange={(x) => set("entrada.atraso_reacao_critico_ms.1", x)} dica="Sugestão: 0–50ms — cura forte/poção de vida não devem esperar." />
           </Secao>
           <Secao titulo="Segurança" descricao="Hotkeys globais e janela-alvo.">
             <CampoTexto label="Hotkey pausar" valor={v("seguranca.hotkey_pausar")} onChange={(x) => set("seguranca.hotkey_pausar", x)} />

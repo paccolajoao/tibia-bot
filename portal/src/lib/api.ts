@@ -1,4 +1,12 @@
-import type { Config, FrameCalibracao, Meta, PerfilResumo, Regiao } from "./types"
+import type {
+  Config,
+  FrameCalibracao,
+  Meta,
+  PerfilResumo,
+  Regiao,
+  TesteArduinoBody,
+  TesteArduinoResultado,
+} from "./types"
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -52,4 +60,8 @@ export const api = {
   // meta + calibração
   meta: () => req<Meta>("/api/meta"),
   capturarFrame: () => req<FrameCalibracao>("/api/calibracao/frame", { method: "POST" }),
+
+  // entrada: teste rápido do board Arduino (não salva nada)
+  testarArduino: (body: TesteArduinoBody) =>
+    req<TesteArduinoResultado>("/api/entrada/arduino/testar", { method: "POST", body: JSON.stringify(body) }),
 }
