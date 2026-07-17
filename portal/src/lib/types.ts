@@ -110,6 +110,7 @@ export interface UsarManaConfig {
 }
 
 export type WaypointTipo = "ir" | "andar_em" | "usar" | "tecla" | "esperar"
+export type WaypointDirecao = "" | "subir" | "descer"
 
 export interface Waypoint {
   tipo: WaypointTipo
@@ -119,6 +120,7 @@ export interface Waypoint {
   tecla: string | null
   dwell_s: number
   troca_andar: boolean
+  direcao: WaypointDirecao
 }
 
 export interface CavebotConfig {

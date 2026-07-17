@@ -135,7 +135,8 @@ regiões** e **reinicie** o `executar.py` para aplicar.
 > **Cavebot:** calibre o **Minimapa**, ligue em **Recursos** e, em **Configurações → Cavebot**,
 > **grave a rota** clicando em *Gravar waypoint*: tipo **Ir** (clique no minimapa) para andar, e
 > **Pisar/Usar/Tecla** para escada/buraco/corda (marque *muda de andar* para o bot validar a troca
-> de andar). Use ▲▼ para ordenar. A rota repete em loop.
+> de andar por mudança persistente do minimapa, e escolha a *Direção* — subir/descer — para
+> organizar a rota e os logs). Use ▲▼ para ordenar. A rota repete em loop.
 
 > **Magia de ataque:** com a battle list calibrada, ligue em **Recursos** e ajuste a hotkey +
 > piso de mana em **Configurações → Magia de ataque**.
@@ -179,7 +180,7 @@ todas as seções abaixo:
 | `magia_ataque` | `ativo` / `tecla` / `intervalo_s` / `mana_minima` | em combate, aperta 1 hotkey de ataque a cada `intervalo_s`; não ataca abaixo de `mana_minima`% |
 | `cavebot` | `ativo` / `waypoints` / `cooldown_s` | navegação por waypoints no minimapa (rota em loop). Exige `regioes.minimap` |
 | `cavebot` | `combate_timeout_s` | se há criatura mas nenhuma morte por este tempo (bicho inalcançável), volta a andar. `0` = nunca desiste |
-| `cavebot` | `limiar_troca_andar` / `tentativas_troca` | validação de escada/buraco/corda: pico do minimapa que confirma a troca + nº de re-tentativas |
+| `cavebot` | `limiar_troca_andar` / `tentativas_troca` | validação de escada/buraco/corda: mudança **persistente** do minimapa (vs. um snapshot pré-ação) que confirma a troca + nº de re-tentativas |
 | `visao` | `confianca_minima` | abaixo disso, ignora a leitura (não cura errado) |
 | `visao` | `hp.invertido` / `mana.invertido` | direção de preenchimento da barra (mana enche da direita) |
 | `captura` | `backend` | `auto` \| `bettercam` \| `wgc` \| `mss` \| `obs` \| `tibia_arquivo` |
@@ -366,11 +367,12 @@ firmware de referência (`arduino/entrada_hid/entrada_hid.ino`) e as instruçõe
 completas — inclui uma limitação importante do Windows (mouse absoluto via HID só
 alcança o **monitor primário**).
 
-Depois de gravado, configure em **Configurações → Sistema → Entrada**: escolha o
-backend `Arduino` e a porta serial. Essa mesma aba também tem o **atraso de reação
-humana** (pausa aleatória, configurável em ms, antes de cada ação — com uma faixa
-curta separada para curas críticas, que não devem esperar); funciona com qualquer um
-dos dois backends, não só o Arduino.
+Depois de gravado, configure na aba dedicada **Configurações → Arduino**: escolha o
+backend `Arduino`, a porta serial (baud/timeout/resolução) e use o **checklist** +
+**teste de hardware ao vivo** (ping/tecla/mouse) para validar o board antes de rodar.
+O **atraso de reação humana** (pausa aleatória, configurável em ms, antes de cada ação
+— com uma faixa curta separada para curas críticas, que não devem esperar) fica na aba
+**Sistema** e funciona com qualquer um dos dois backends, não só o Arduino.
 
 ## Troubleshooting
 

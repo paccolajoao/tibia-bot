@@ -21,6 +21,35 @@ import numpy as np
 LADO_MASCARA_CENTRO = 6
 
 
+def diferenca_minimapa(
+    crop_a: np.ndarray,
+    crop_b: np.ndarray | None,
+) -> float:
+    """Diff absoluto médio por pixel (0..255) entre dois crops do minimapa,
+    ignorando o marcador central do player.
+
+    Base compartilhada por `minimapa_movendo` (crops consecutivos → detecta rolagem)
+    e pela validação de troca de andar do cavebot (crop atual × referência pré-ação →
+    detecta que o mapa mudou de forma persistente). Sem crop de comparação (1ª leitura),
+    shapes diferentes (região recém-mudada) ou crop vazio => 0.0.
+    """
+    if crop_b is None or crop_a.shape != crop_b.shape or crop_a.size == 0:
+        return 0.0
+
+    a = cv2.cvtColor(crop_a, cv2.COLOR_BGR2GRAY) if crop_a.ndim == 3 else crop_a
+    b = cv2.cvtColor(crop_b, cv2.COLOR_BGR2GRAY) if crop_b.ndim == 3 else crop_b
+
+    diff = cv2.absdiff(a, b)
+
+    # mascara o marcador do player no centro (zera o diff lá)
+    h, w = diff.shape[:2]
+    cy, cx = h // 2, w // 2
+    r = LADO_MASCARA_CENTRO // 2
+    diff[max(0, cy - r):cy + r + 1, max(0, cx - r):cx + r + 1] = 0
+
+    return float(diff.mean())
+
+
 def minimapa_movendo(
     crop_atual: np.ndarray,
     crop_anterior: np.ndarray | None,
@@ -32,21 +61,5 @@ def minimapa_movendo(
     de `limiar` => movendo. Sem crop anterior (1ª leitura) ou shapes diferentes
     (região recém-mudada) => não-movendo, score 0.
     """
-    if crop_anterior is None or crop_atual.shape != crop_anterior.shape:
-        return (False, 0.0)
-    if crop_atual.size == 0:
-        return (False, 0.0)
-
-    a = cv2.cvtColor(crop_atual, cv2.COLOR_BGR2GRAY) if crop_atual.ndim == 3 else crop_atual
-    b = cv2.cvtColor(crop_anterior, cv2.COLOR_BGR2GRAY) if crop_anterior.ndim == 3 else crop_anterior
-
-    diff = cv2.absdiff(a, b)
-
-    # mascara o marcador do player no centro (zera o diff lá)
-    h, w = diff.shape[:2]
-    cy, cx = h // 2, w // 2
-    r = LADO_MASCARA_CENTRO // 2
-    diff[max(0, cy - r):cy + r + 1, max(0, cx - r):cx + r + 1] = 0
-
-    score = float(diff.mean())
+    score = diferenca_minimapa(crop_atual, crop_anterior)
     return (score > limiar, score)

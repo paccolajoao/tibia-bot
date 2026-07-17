@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { CampoNumero, CampoSelect, CampoSwitch, CampoTecla } from "@/components/campos"
 import { api } from "@/lib/api"
-import type { FrameCalibracao, Waypoint, WaypointTipo } from "@/lib/types"
+import type { FrameCalibracao, Waypoint, WaypointDirecao, WaypointTipo } from "@/lib/types"
 
 const TIPOS: { valor: WaypointTipo; rotulo: string }[] = [
   { valor: "ir", rotulo: "Ir (clicar no minimapa)" },
@@ -36,6 +36,12 @@ const ROTULO_TIPO: Record<WaypointTipo, string> = {
 const TIPOS_PONTO: WaypointTipo[] = ["ir", "andar_em", "usar"]
 // tipos que PODEM mudar de andar (escada/buraco/corda/pá) — habilitam a validação
 const TIPOS_TROCA: WaypointTipo[] = ["andar_em", "usar", "tecla"]
+// Radix Select não aceita value="" em itens; usamos "nenhuma" como sentinela do vazio.
+const DIRECOES: { valor: string; rotulo: string }[] = [
+  { valor: "nenhuma", rotulo: "Nenhuma" },
+  { valor: "subir", rotulo: "Subir" },
+  { valor: "descer", rotulo: "Descer" },
+]
 
 /** Lista ordenada de waypoints do cavebot + diálogo para gravar um novo (clicando no frame). */
 export function Waypoints({
@@ -89,6 +95,7 @@ export function Waypoints({
               <span className="w-6 text-center text-xs font-bold tabular-nums text-muted-foreground">{i + 1}</span>
               <Badge variant="secondary">{ROTULO_TIPO[wp.tipo]}</Badge>
               {wp.troca_andar && <Badge variant="warning">andar</Badge>}
+              {wp.direcao && <Badge variant="outline">{wp.direcao}</Badge>}
               <span className="flex-1 truncate text-sm">
                 {wp.nome || "(sem nome)"}
                 {TIPOS_PONTO.includes(wp.tipo) && (
@@ -131,6 +138,7 @@ function GravarWaypoint({
   const [tecla, setTecla] = useState("f9")
   const [dwell, setDwell] = useState(1.5)
   const [trocaAndar, setTrocaAndar] = useState(false)
+  const [direcao, setDirecao] = useState<WaypointDirecao>("")
   const [frame, setFrame] = useState<FrameCalibracao | null>(null)
   const [carregando, setCarregando] = useState(false)
   const [ponto, setPonto] = useState<{ x: number; y: number } | null>(null) // coords de frame
@@ -196,6 +204,7 @@ function GravarWaypoint({
       tecla: tipo === "tecla" ? tecla.trim() : null,
       dwell_s: dwell,
       troca_andar: podeTrocarAndar && trocaAndar,
+      direcao: podeTrocarAndar ? direcao : "",
     })
   }
 
@@ -236,6 +245,14 @@ function GravarWaypoint({
             dica="Escada/buraco/corda/pá: o bot confirma a troca pelo minimapa e re-tenta se falhar (não trava)."
             valor={trocaAndar}
             onChange={setTrocaAndar}
+          />
+        )}
+        {podeTrocarAndar && (
+          <CampoSelect
+            label="Direção"
+            valor={direcao || "nenhuma"}
+            onChange={(x) => setDirecao(x === "nenhuma" ? "" : (x as WaypointDirecao))}
+            opcoes={DIRECOES}
           />
         )}
       </div>

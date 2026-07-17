@@ -34,7 +34,8 @@ from bot.decisao.tipos import Decisao, TipoAcao
 CHAVE_COOLDOWN = "cavebot"
 CHAVE_ACAO_TS = "cavebot_acao_ts"        # carimbado pelo loop após executar nossa ação
 CHAVE_MINIMAP_MOVENDO = "minimap_movendo"
-CHAVE_MINIMAP_SCORE = "minimap_score"    # diff médio do minimapa (pico = troca de andar)
+CHAVE_MINIMAP_SCORE = "minimap_score"    # diff médio entre frames consecutivos (rolagem)
+CHAVE_MINIMAP_DIFF_REF = "minimap_diff_ref"  # diff vs. referência pré-ação (troca persistente)
 CHAVE_MORTE = "saque_morte_ts"           # ts da última morte (queda na battle list)
 
 
@@ -150,9 +151,16 @@ class Cavebot:
     def _verificar_troca_andar(
         self, wp: Waypoint, ts: float, estado: dict, timeout: bool
     ) -> Decisao | None:
-        """Confirma a troca de andar pelo pico do minimapa; re-tenta/segue se falhar."""
-        score = float(estado.get(CHAVE_MINIMAP_SCORE, 0.0))
-        if not self._trocou and score >= self.cfg.limiar_troca_andar:
+        """Confirma a troca de andar por mudança PERSISTENTE do minimapa; re-tenta/segue se falhar.
+
+        Uma troca real substitui o mapa inteiro e o deixa persistentemente diferente da
+        referência pré-ação (`minimap_diff_ref`), depois assenta (`minimap_movendo=False`).
+        Um pico transitório (respawn/teleporte/combate) volta a um mapa parecido -> diff_ref
+        cai a ~0 e NÃO confirma, evitando avançar o waypoint no lugar errado.
+        """
+        diff_ref = float(estado.get(CHAVE_MINIMAP_DIFF_REF, 0.0))
+        assentado = not bool(estado.get(CHAVE_MINIMAP_MOVENDO, False))
+        if not self._trocou and diff_ref >= self.cfg.limiar_troca_andar and assentado:
             self._trocou = True
             self._inicio_troca = ts  # confirmou: agora deixa assentar
 
@@ -182,7 +190,13 @@ class Cavebot:
     def _emitir(self, wp: Waypoint) -> Decisao | None:
         rotulo = wp.nome or f"#{self._idx}"
         sufixo = self._sufixo_tentativa(wp)
-        base_dados = {"recurso": "cavebot", "tipo": wp.tipo, "idx": self._idx}
+        dir_ = self._prefixo_direcao(wp)  # "subir "/"descer "/"" p/ o log
+        base_dados = {
+            "recurso": "cavebot",
+            "tipo": wp.tipo,
+            "idx": self._idx,
+            "troca_andar": wp.troca_andar,  # o loop tira a referência pré-ação quando True
+        }
 
         if wp.tipo == "tecla":
             if not wp.tecla:
@@ -192,7 +206,7 @@ class Cavebot:
                 self.nome,
                 TipoAcao.PRESSIONAR_TECLA,
                 tecla=wp.tecla,
-                motivo=f"cavebot {rotulo}: tecla {wp.tecla}{sufixo}",
+                motivo=f"cavebot {rotulo}: {dir_}tecla {wp.tecla}{sufixo}",
                 prioridade=self.prioridade,
                 dados=base_dados,
                 chave_cooldown=CHAVE_COOLDOWN,
@@ -203,7 +217,7 @@ class Cavebot:
                 self.nome,
                 TipoAcao.CLICAR_DIREITO,
                 tecla=None,
-                motivo=f"cavebot {rotulo}: usar (clique-direito){sufixo}",
+                motivo=f"cavebot {rotulo}: {dir_}usar (clique-direito){sufixo}",
                 prioridade=self.prioridade,
                 dados={**base_dados, "transformar": True},
                 ponto=(wp.x, wp.y),
@@ -227,12 +241,18 @@ class Cavebot:
             self.nome,
             TipoAcao.CLICAR,
             tecla=None,
-            motivo=f"cavebot {rotulo}: pisar no tile (troca de andar){sufixo}",
+            motivo=f"cavebot {rotulo}: {dir_}pisar no tile (troca de andar){sufixo}",
             prioridade=self.prioridade,
             dados={**base_dados, "transformar": True},
             ponto=(wp.x, wp.y),
             chave_cooldown=CHAVE_COOLDOWN,
         )
+
+    def _prefixo_direcao(self, wp: Waypoint) -> str:
+        """Rótulo 'subir '/'descer ' p/ o log (organização da rota); '' se não definido."""
+        if wp.direcao in ("subir", "descer"):
+            return f"{wp.direcao} "
+        return ""
 
     def _sufixo_tentativa(self, wp: Waypoint) -> str:
         """Mostra a tentativa no log quando estamos re-tentando uma troca de andar."""

@@ -241,8 +241,11 @@ class Waypoint(BaseModel):
     tecla: str | None = None  # p/ tipo "tecla" (hotkey de corda/pá bindada no Tibia)
     dwell_s: float = 1.5      # espera após executar (troca de andar / assentar)
     # marca waypoints que MUDAM DE ANDAR (escada/buraco/corda/pá): o cavebot valida a
-    # troca pelo pico do minimapa e re-tenta se falhar (ver CavebotConfig.limiar_troca_andar)
+    # troca pela mudança persistente do minimapa e re-tenta se falhar (ver
+    # CavebotConfig.limiar_troca_andar)
     troca_andar: bool = False
+    # rótulo de direção da troca de andar (organização da rota + log); não muda a mecânica.
+    direcao: str = ""         # "" | subir | descer
 
 
 class CavebotConfig(BaseModel):

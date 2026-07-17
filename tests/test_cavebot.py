@@ -211,7 +211,7 @@ def test_combate_timeout_zero_nunca_desiste():
 
 # ----------------------------- validação de troca de andar -----------------------------
 
-def test_troca_andar_confirma_por_pico_do_minimapa():
+def test_troca_andar_confirma_por_mudanca_persistente():
     cfg = _cfg(
         [Waypoint(tipo="usar", x=1, y=1, troca_andar=True, dwell_s=0.0), Waypoint(tipo="ir", x=2, y=2)],
         limiar_troca_andar=25.0,
@@ -220,16 +220,49 @@ def test_troca_andar_confirma_por_pico_do_minimapa():
     ctx = _ctx(cfg, ts=10.0)
     d0 = cb.avaliar(ctx)
     assert d0.acao == TipoAcao.CLICAR_DIREITO  # usar = clique-direito
+    assert d0.dados["troca_andar"] is True  # o loop tira a referência pré-ação
     _executou(ctx, 10.0)
     ctx.ts = 10.1
-    ctx.estado_comportamentos["minimap_score"] = 5.0  # sem pico ainda
+    ctx.estado_comportamentos["minimap_diff_ref"] = 5.0  # mapa ainda parecido com a referência
     assert cb.avaliar(ctx) is None
     ctx.ts = 10.2
-    ctx.estado_comportamentos["minimap_score"] = 40.0  # pico -> troca confirmada
+    # mapa persistentemente diferente da referência E assentado -> troca confirmada
+    ctx.estado_comportamentos["minimap_diff_ref"] = 40.0
+    ctx.estado_comportamentos["minimap_movendo"] = False
     assert cb.avaliar(ctx) is None  # dwell_s=0 -> avança no mesmo tick
     ctx.ts = 10.3
     d1 = cb.avaliar(ctx)
     assert d1.acao == TipoAcao.CLICAR and d1.ponto == (2, 2)  # próximo waypoint
+
+
+def test_troca_andar_pico_transitorio_nao_confirma():
+    # respawn/teleporte/combate causam um pico que NÃO persiste: o mapa volta a ficar
+    # parecido com a referência (diff_ref cai) -> NÃO deve confirmar troca, cai em timeout.
+    cfg = _cfg(
+        [Waypoint(tipo="usar", x=1, y=1, troca_andar=True, dwell_s=0.0), Waypoint(tipo="ir", x=2, y=2)],
+        limiar_troca_andar=25.0,
+        timeout_trecho_s=1.0,
+        tentativas_troca=1,
+    )
+    cb = Cavebot(cfg.cavebot)
+    ctx = _ctx(cfg, ts=10.0)
+    cb.avaliar(ctx)
+    _executou(ctx, 10.0)
+    ctx.ts = 10.1
+    # pico transitório, mas o minimapa ainda está rolando (não assentado) -> não confirma
+    ctx.estado_comportamentos["minimap_diff_ref"] = 40.0
+    ctx.estado_comportamentos["minimap_movendo"] = True
+    assert cb.avaliar(ctx) is None
+    ctx.ts = 10.5
+    # assentou, mas o mapa voltou a se parecer com a referência (diff_ref caiu) -> não confirma
+    ctx.estado_comportamentos["minimap_diff_ref"] = 3.0
+    ctx.estado_comportamentos["minimap_movendo"] = False
+    assert cb.avaliar(ctx) is None
+    ctx.ts = 11.2  # estoura o timeout com tentativas=1 -> avança best-effort (não trava)
+    assert cb.avaliar(ctx) is None
+    ctx.ts = 11.3
+    d_next = cb.avaliar(ctx)
+    assert d_next.ponto == (2, 2)
 
 
 def test_troca_andar_retenta_e_segue_apos_esgotar():
@@ -244,7 +277,7 @@ def test_troca_andar_retenta_e_segue_apos_esgotar():
     cb.avaliar(ctx)  # emite a 1ª tentativa
     _executou(ctx, 10.0)
     ctx.ts = 10.1
-    ctx.estado_comportamentos["minimap_score"] = 0.0  # nunca tem pico
+    ctx.estado_comportamentos["minimap_diff_ref"] = 0.0  # mapa nunca muda de fato
     assert cb.avaliar(ctx) is None
     ctx.ts = 11.2  # estoura o timeout -> re-tenta (não avança)
     assert cb.avaliar(ctx) is None

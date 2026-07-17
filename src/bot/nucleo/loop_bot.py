@@ -128,6 +128,10 @@ class LoopBot(threading.Thread):
         self._minimap_centro: tuple[int, int] = ((_ml + _mr) // 2, (_mt + _mb) // 2)
         self._limiar_movimento_minimap = cfg.cavebot.limiar_movimento
         self._minimap_anterior = None
+        # referência pré-ação p/ validar troca de andar: snapshot do minimapa tirado
+        # quando uma ação de troca_andar do cavebot executa; comparado a cada tick
+        # (minimap_diff_ref) p/ confirmar mudança PERSISTENTE (não um pico transitório).
+        self._minimap_ref = None
         self._periodo = 1.0 / max(1.0, cfg.captura.fps_alvo)
         self._periodo_quadro = 1.0 / max(1.0, cfg.painel.fps_quadro)
         self._ultimo_motivo: str | None = None
@@ -326,6 +330,11 @@ class LoopBot(threading.Thread):
                 # "aguardando chegada" após esse carimbo (evita esperar um trecho
                 # que nunca andou por causa de clique não-executado).
                 self.ctx.estado_comportamentos["cavebot_acao_ts"] = t0
+                if dec.dados.get("troca_andar") and self._minimap_anterior is not None:
+                    # snapshot pré-ação: _detectar_minimap rodou ANTES de decidir/executar,
+                    # então _minimap_anterior ainda é o crop de antes da troca. A troca real
+                    # deixa o minimapa persistentemente diferente desta referência.
+                    self._minimap_ref = self._minimap_anterior.copy()
 
         self._publicar_decisao(dec)
         self._publicar_deteccao()
@@ -426,7 +435,7 @@ class LoopBot(threading.Thread):
         """
         if not self._minimap_ativo or self._reg_minimap is None:
             return
-        from bot.visao.minimap import minimapa_movendo
+        from bot.visao.minimap import diferenca_minimapa, minimapa_movendo
 
         frame_mm = self.cap.capturar(self._reg_minimap)
         if frame_mm is None:
@@ -435,9 +444,12 @@ class LoopBot(threading.Thread):
         esq, topo, dir_, base = reg_img
         crop = frame_mm.imagem[topo:base, esq:dir_]
         movendo, score = minimapa_movendo(crop, self._minimap_anterior, self._limiar_movimento_minimap)
+        # diff vs. a referência pré-ação de troca de andar (0.0 quando não há troca em curso).
+        diff_ref = diferenca_minimapa(crop, self._minimap_ref) if self._minimap_ref is not None else 0.0
         self._minimap_anterior = crop.copy()
         self.ctx.estado_comportamentos["minimap_movendo"] = movendo
         self.ctx.estado_comportamentos["minimap_score"] = score
+        self.ctx.estado_comportamentos["minimap_diff_ref"] = diff_ref
 
     def _rastrear_mortes(self, det: DeteccaoCriaturas | None, ts: float) -> None:
         """Detecta morte (queda na contagem de criaturas) e carimba o ts no contexto.

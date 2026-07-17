@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from bot.visao.minimap import minimapa_movendo
+from bot.visao.minimap import diferenca_minimapa, minimapa_movendo
 
 
 def _crop(valor: int) -> np.ndarray:
@@ -48,3 +48,32 @@ def test_marcador_central_e_mascarado():
     movendo, score = minimapa_movendo(a, b, limiar=2.0)
     assert movendo is False
     assert score == 0.0
+
+
+# ----------------------------- diferenca_minimapa (validação de troca) -----------------------------
+
+def test_diferenca_crops_iguais_e_zero():
+    a = _crop(120)
+    assert diferenca_minimapa(a, a.copy()) == 0.0
+
+
+def test_diferenca_sem_referencia_e_zero():
+    assert diferenca_minimapa(_crop(100), None) == 0.0
+
+
+def test_diferenca_shapes_diferentes_e_zero():
+    a = np.zeros((40, 40, 3), dtype=np.uint8)
+    b = np.zeros((30, 30, 3), dtype=np.uint8)
+    assert diferenca_minimapa(a, b) == 0.0
+
+
+def test_diferenca_mapa_trocado_e_alta():
+    # troca de andar: o mapa fica persistentemente diferente da referência.
+    assert diferenca_minimapa(_crop(40), _crop(200)) > 25.0
+
+
+def test_diferenca_ignora_marcador_central():
+    a = _crop(100)
+    b = _crop(100)
+    b[19:22, 19:22] = 255  # só o marcador central mudou
+    assert diferenca_minimapa(a, b) == 0.0
