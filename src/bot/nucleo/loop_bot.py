@@ -132,6 +132,17 @@ class LoopBot(threading.Thread):
         # quando uma ação de troca_andar do cavebot executa; comparado a cada tick
         # (minimap_diff_ref) p/ confirmar mudança PERSISTENTE (não um pico transitório).
         self._minimap_ref = None
+        # navegação por MARCAS nativas: ícones cadastrados que o cavebot manda detectar
+        # no minimapa (chegada = marca no centro). Decodificados 1x aqui (espelha o drop).
+        self._marcas: dict[str, object] = {}
+        self._marca_threshold = cfg.cavebot.marca_threshold
+        if self._minimap_ativo:
+            from bot.visao.inventario import decodificar_template
+
+            for m in cfg.cavebot.marcas:
+                tpl = decodificar_template(m.template_b64)
+                if tpl is not None and m.nome:
+                    self._marcas[m.nome] = tpl
         self._periodo = 1.0 / max(1.0, cfg.captura.fps_alvo)
         self._periodo_quadro = 1.0 / max(1.0, cfg.painel.fps_quadro)
         self._ultimo_motivo: str | None = None
@@ -447,9 +458,25 @@ class LoopBot(threading.Thread):
         # diff vs. a referência pré-ação de troca de andar (0.0 quando não há troca em curso).
         diff_ref = diferenca_minimapa(crop, self._minimap_ref) if self._minimap_ref is not None else 0.0
         self._minimap_anterior = crop.copy()
-        self.ctx.estado_comportamentos["minimap_movendo"] = movendo
-        self.ctx.estado_comportamentos["minimap_score"] = score
-        self.ctx.estado_comportamentos["minimap_diff_ref"] = diff_ref
+        estado = self.ctx.estado_comportamentos
+        estado["minimap_movendo"] = movendo
+        estado["minimap_score"] = score
+        estado["minimap_diff_ref"] = diff_ref
+        # navegação por marca: detecta o ícone que o cavebot pediu (cavebot_marca_alvo).
+        # Publica o offset (do centro) e o score p/ o cavebot clicar/detectar chegada e
+        # p/ o portal exibir ao vivo (calibrar marca_threshold). offset_de = de qual marca
+        # é o offset, p/ o cavebot ignorar leitura stale de outra marca.
+        alvo = estado.get("cavebot_marca_alvo")
+        if alvo and alvo in self._marcas:
+            from bot.visao.marca_minimapa import detectar_marca
+
+            achou, offset, msc = detectar_marca(crop, self._marcas[alvo], self._marca_threshold)
+            estado["cavebot_marca_offset"] = offset if achou else None
+            estado["cavebot_marca_score"] = msc
+        else:
+            estado["cavebot_marca_offset"] = None
+            estado["cavebot_marca_score"] = 0.0
+        estado["cavebot_marca_offset_de"] = alvo
 
     def _rastrear_mortes(self, det: DeteccaoCriaturas | None, ts: float) -> None:
         """Detecta morte (queda na contagem de criaturas) e carimba o ts no contexto.
@@ -562,6 +589,7 @@ class LoopBot(threading.Thread):
                 estado_execucao=self.ctrl.atual().name,
                 janela_focada=self.ctx.janela_focada,
                 backend_captura=getattr(self.cap, "nome_backend", "?"),
+                cavebot=self.ctx.estado_comportamentos.get("cavebot_status"),
             )
         )
 

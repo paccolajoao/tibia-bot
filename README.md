@@ -15,10 +15,13 @@ estatísticas.
   de magias — exori → exori gran → … — você monta nessa hotkey no próprio Tibia), com **piso de
   mana** para não esvaziar a mana da cura.
 - ✅ **Cavebot (navegação por waypoints)** — caminha a hunt **clicando no minimapa** (o Tibia
-  pathfinda cada trecho); a chegada é detectada quando o minimapa **para de rolar**. Rota em
-  **loop**. Trata **subida/descida** (escadas/buracos/cordas) com **validação da troca de andar**
-  e *watchdog* anti-travamento (se um bicho é inalcançável, volta a andar). Grave a rota clicando
-  no portal.
+  pathfinda cada trecho). **Recomendado: navegação por MARCAS nativas do Tibia** — você coloca
+  marcas no minimapa do jogo, cadastra o ícone no portal, e o bot **re-detecta a marca a cada ciclo
+  e re-clica na posição atual dela** até ela chegar ao **centro** (= chegou → próxima marca). Como
+  o alvo é sempre a posição **viva** do ícone, é **autocorretivo**: sem deriva, e se um bicho no
+  meio do caminho deslocar o boneco, ao matá-lo ele já re-clica onde a marca está agora (ataca no
+  caminho normalmente). Rota em **loop**. Trata **subida/descida** (escadas/buracos/cordas) com
+  **validação da troca de andar** e *watchdog* anti-travamento (bicho inalcançável → volta a andar).
 - ✅ **Usar mana (treino de Magic Level)** — aperta uma tecla (ex.: cura forte) enquanto a mana
   está cheia, com histerese, para gastar mana e treinar ML.
 - ✅ **Drop de loot** — cadastre itens no portal (recortando o ícone **ou enviando um PNG/GIF**) e o
@@ -30,7 +33,9 @@ estatísticas.
   (visão/input/comportamento) é logada e o loop **segue** — uma falha pontual nunca derruba o bot.
 - ✅ **Dashboard web ao vivo** — HP/Mana, detecção (criaturas/alvo), decisão atual, log de
   raciocínio, preview anotado e estatísticas (abates, alvos, curas forte/leve, poções e usos de
-  mana, saques, refeições, passos do cavebot, magias de ataque) com taxas por minuto.
+  mana, saques, refeições, passos do cavebot, magias de ataque) com taxas por minuto. Tem também um
+  **card do Cavebot** ao vivo: fase (procurando marca / andando / cedendo ao combate / chegou),
+  waypoint atual, marca e o **score de detecção** — pra você ver na hora por que ele anda ou não.
 
 > As barras de HP/Mana são lidas por amostragem de pixels (HSV), robusta aos **números
 > sobrepostos** na barra. A **mana** do Tibia esvazia da esquerda→direita: marque
@@ -132,11 +137,14 @@ regiões** e **reinicie** o `executar.py` para aplicar.
 > ícone de um frame capturado **ou enviando um PNG/GIF** do item. O reconhecimento é multi-escala,
 > então ícones de tamanho um pouco diferente ainda casam.
 
-> **Cavebot:** calibre o **Minimapa**, ligue em **Recursos** e, em **Configurações → Cavebot**,
-> **grave a rota** clicando em *Gravar waypoint*: tipo **Ir** (clique no minimapa) para andar, e
-> **Pisar/Usar/Tecla** para escada/buraco/corda (marque *muda de andar* para o bot validar a troca
-> de andar por mudança persistente do minimapa, e escolha a *Direção* — subir/descer — para
-> organizar a rota e os logs). Use ▲▼ para ordenar. A rota repete em loop.
+> **Cavebot:** calibre o **Minimapa** e ligue em **Recursos**. Em **Configurações → Cavebot**:
+> **1)** coloque marcas no minimapa do **Tibia** nos pontos da rota e **cadastre o ícone** de cada
+> uma em *Cadastrar marca* (recorte do frame ou envie um PNG) — o botão *Testar* mostra o score da
+> detecção (ajuste a *Confiança da marca* se não detectar). **2)** em *Gravar waypoint*, tipo **Ir**
+> → escolha a **Marca** (o bot anda até ela; chegada quando ela chega ao centro); use
+> **Pisar/Usar/Tecla** para escada/buraco/corda (marque *muda de andar* + *Direção* subir/descer).
+> Use ▲▼ para ordenar; a rota repete em loop. **Mantenha o zoom do minimapa** igual ao do cadastro,
+> e coloque as marcas **próximas o bastante** para a próxima aparecer no minimapa a partir da atual.
 
 > **Magia de ataque:** com a battle list calibrada, ligue em **Recursos** e ajuste a hotkey +
 > piso de mana em **Configurações → Magia de ataque**.
@@ -179,6 +187,7 @@ todas as seções abaixo:
 | `drop` | `ativo` / `itens` / `threshold` | drop de loot: itens (com template) a arrastar p/ o chão e a confiança do reconhecimento |
 | `magia_ataque` | `ativo` / `tecla` / `intervalo_s` / `mana_minima` | em combate, aperta 1 hotkey de ataque a cada `intervalo_s`; não ataca abaixo de `mana_minima`% |
 | `cavebot` | `ativo` / `waypoints` / `cooldown_s` | navegação por waypoints no minimapa (rota em loop). Exige `regioes.minimap` |
+| `cavebot` | `marcas` / `marca_threshold` / `marca_raio_centro` | marcas nativas (ícones) p/ o waypoint `ir`: confiança do reconhecimento + raio (px) do centro que conta como "chegou" |
 | `cavebot` | `combate_timeout_s` | se há criatura mas nenhuma morte por este tempo (bicho inalcançável), volta a andar. `0` = nunca desiste |
 | `cavebot` | `limiar_troca_andar` / `tentativas_troca` | validação de escada/buraco/corda: mudança **persistente** do minimapa (vs. um snapshot pré-ação) que confirma a troca + nº de re-tentativas |
 | `visao` | `confianca_minima` | abaixo disso, ignora a leitura (não cura errado) |
@@ -229,7 +238,7 @@ menos um waypoint gravado.
 executar.py / calibrar.py        # entrypoints
 src/bot/
   captura/    base · dxgi · wgc · mss_fallback · obs_virtualcam · mapeamento · tibia_arquivo · instantaneo · fabrica
-  visao/      barra_recursos · estabilizador · lista_batalha · inventario · minimap · anotador · tipos
+  visao/      barra_recursos · estabilizador · lista_batalha · inventario · minimap · marca_minimapa · anotador · tipos
   decisao/    motor · cooldown · comportamentos/(camada_cura, alvo, comer, saque, drop, usar_mana, magia_ataque, cavebot)
   telemetria/ eventos · barramento · estatisticas
   entrada/    teclado_directinput · teclado_arduino · fabrica · atrasos · simulada
@@ -274,8 +283,10 @@ comportamentos abaixo.
 4. ✅ **Drop de loot** (`drop.py`, ~50) — arrasta itens cadastrados (template matching) p/ o chão.
 5. ✅ **Magia de ataque** (`magia_ataque.py`, ~70) — 1 hotkey de ataque em combate, com piso de mana.
 6. ✅ **Cavebot/waypoints** (`cavebot.py`, ~20) — navegação por **clique no minimapa** (o Tibia
-   pathfinda cada trecho; chegada por "minimapa parou de rolar"), rota em loop, validação de troca
-   de andar e watchdog anti-travamento. **Não** usa A\*/grade — é pixel-puro, mais simples e robusto.
+   pathfinda cada trecho), rota em loop, validação de troca de andar e watchdog anti-travamento.
+   Waypoint `ir` mira uma **marca nativa do Tibia** detectada no minimapa (chegada quando a marca
+   chega ao centro — absoluto, autocorretivo) ou um offset do centro (legado). **Não** usa A\*/grade
+   — é pixel-puro. *Próximo:* detectar várias instâncias da mesma marca (hoje é a melhor por ícone).
 7. **Bestiário** — contagem de kills por criatura (depende de targeting).
 
 Cross-cutting: OCR (`pytesseract`) para números absolutos de HP/Mana no painel; auto-loot

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { CampoNumero, CampoSelect, CampoSwitch, CampoTecla } from "@/components/campos"
 import { api } from "@/lib/api"
-import type { FrameCalibracao, Waypoint, WaypointDirecao, WaypointTipo } from "@/lib/types"
+import type { FrameCalibracao, MarcaMinimapa, Waypoint, WaypointDirecao, WaypointTipo } from "@/lib/types"
 
 const TIPOS: { valor: WaypointTipo; rotulo: string }[] = [
   { valor: "ir", rotulo: "Ir (clicar no minimapa)" },
@@ -48,10 +48,12 @@ export function Waypoints({
   waypoints,
   onChange,
   minimapRegiao,
+  marcas = [],
 }: {
   waypoints: Waypoint[]
   onChange: (wps: Waypoint[]) => void
   minimapRegiao?: [number, number, number, number] | null
+  marcas?: MarcaMinimapa[]
 }) {
   const [aberto, setAberto] = useState(false)
 
@@ -80,7 +82,7 @@ export function Waypoints({
               <Plus /> Gravar waypoint
             </Button>
           </DialogTrigger>
-          <GravarWaypoint onAdicionar={adicionar} minimapRegiao={minimapRegiao} />
+          <GravarWaypoint onAdicionar={adicionar} minimapRegiao={minimapRegiao} marcas={marcas} />
         </Dialog>
       </div>
 
@@ -96,9 +98,10 @@ export function Waypoints({
               <Badge variant="secondary">{ROTULO_TIPO[wp.tipo]}</Badge>
               {wp.troca_andar && <Badge variant="warning">andar</Badge>}
               {wp.direcao && <Badge variant="outline">{wp.direcao}</Badge>}
+              {wp.marca && <Badge variant="outline">marca: {wp.marca}</Badge>}
               <span className="flex-1 truncate text-sm">
                 {wp.nome || "(sem nome)"}
-                {TIPOS_PONTO.includes(wp.tipo) && (
+                {TIPOS_PONTO.includes(wp.tipo) && !(wp.tipo === "ir" && wp.marca) && (
                   <span className="ml-2 text-xs text-muted-foreground tabular-nums">
                     {wp.tipo === "ir"
                       ? `(${wp.x >= 0 ? "+" : ""}${wp.x}, ${wp.y >= 0 ? "+" : ""}${wp.y}) offset`
@@ -129,9 +132,11 @@ export function Waypoints({
 function GravarWaypoint({
   onAdicionar,
   minimapRegiao,
+  marcas = [],
 }: {
   onAdicionar: (wp: Waypoint) => void
   minimapRegiao?: [number, number, number, number] | null
+  marcas?: MarcaMinimapa[]
 }) {
   const [tipo, setTipo] = useState<WaypointTipo>("ir")
   const [nome, setNome] = useState("")
@@ -139,19 +144,28 @@ function GravarWaypoint({
   const [dwell, setDwell] = useState(1.5)
   const [trocaAndar, setTrocaAndar] = useState(false)
   const [direcao, setDirecao] = useState<WaypointDirecao>("")
+  const [marca, setMarca] = useState("")
   const [frame, setFrame] = useState<FrameCalibracao | null>(null)
   const [carregando, setCarregando] = useState(false)
   const [ponto, setPonto] = useState<{ x: number; y: number } | null>(null) // coords de frame
   const [marcador, setMarcador] = useState<{ x: number; y: number } | null>(null) // coords de display
   const imgRef = useRef<HTMLImageElement>(null)
 
-  const precisaPonto = TIPOS_PONTO.includes(tipo)
+  // "ir" com marca escolhida navega pela marca (detecção no minimapa) — não precisa clicar o ponto.
+  const usaMarca = tipo === "ir" && !!marca
+  const precisaPonto = TIPOS_PONTO.includes(tipo) && !usaMarca
   const podeTrocarAndar = TIPOS_TROCA.includes(tipo)
+  const opcoesMarca = [
+    { valor: "nenhuma", rotulo: "Nenhuma (usar offset do minimapa)" },
+    ...marcas.map((m) => ({ valor: m.nome, rotulo: m.nome })),
+  ]
 
   async function capturar() {
     setCarregando(true)
     try {
-      setFrame(await api.capturarFrame())
+      // "ir" (offset) mira o minimapa: o servidor recorta só ele (mostramos ampliado);
+      // "andar_em"/"usar" miram o game-world -> frame inteiro.
+      setFrame(await api.capturarFrame(tipo === "ir" ? "minimap" : undefined))
       setPonto(null)
       setMarcador(null)
     } catch (e: any) {
@@ -186,11 +200,10 @@ function GravarWaypoint({
     }
     let x = ponto?.x ?? 0
     let y = ponto?.y ?? 0
-    // waypoints "ir" armazenam offset relativo ao centro do minimapa, não coord absoluta.
-    // O centro é fixo na tela (painel do minimapa não se move) e representa sempre a
-    // posição atual do personagem — assim o clique aponta ao mesmo deslocamento in-game
-    // independente de onde o personagem esteja ao executar a rota.
-    if (tipo === "ir" && minimapRegiao) {
+    // waypoints "ir" por OFFSET armazenam o deslocamento relativo ao centro do minimapa
+    // (o centro representa sempre a posição atual do personagem). No modo MARCA não há
+    // ponto: a detecção do ícone fornece o offset em runtime.
+    if (tipo === "ir" && minimapRegiao && ponto) {
       const cx = Math.round((minimapRegiao[0] + minimapRegiao[2]) / 2)
       const cy = Math.round((minimapRegiao[1] + minimapRegiao[3]) / 2)
       x = x - cx
@@ -205,6 +218,7 @@ function GravarWaypoint({
       dwell_s: dwell,
       troca_andar: podeTrocarAndar && trocaAndar,
       direcao: podeTrocarAndar ? direcao : "",
+      marca: tipo === "ir" ? marca : "",
     })
   }
 
@@ -213,11 +227,11 @@ function GravarWaypoint({
       <DialogHeader>
         <DialogTitle>Gravar waypoint</DialogTitle>
         <DialogDescription>
-          <span className="font-medium">Ir</span>: clique no minimapa — grava um offset relativo ao centro
-          (= posição do personagem), então o clique aponta ao mesmo deslocamento in-game em qualquer volta
-          da rota. Mantenha o zoom do minimapa igual ao da gravação.{" "}
-          <span className="font-medium">Pisar/Usar</span>: clique no tile/objeto no game-world para trocar
-          de andar. <span className="font-medium">Tecla</span>: dispara uma hotkey (ex.: corda/pá).
+          <span className="font-medium">Ir</span>: escolha uma <span className="font-medium">Marca</span> (recomendado)
+          para o bot andar até a marca nativa do Tibia — chegada quando ela chega ao centro; ou deixe "Nenhuma" e
+          clique no minimapa para gravar um offset relativo ao centro (mantenha o zoom igual ao da gravação).{" "}
+          <span className="font-medium">Pisar/Usar</span>: clique no tile/objeto no game-world para trocar de andar.{" "}
+          <span className="font-medium">Tecla</span>: dispara uma hotkey (ex.: corda/pá).
         </DialogDescription>
       </DialogHeader>
 
@@ -227,6 +241,15 @@ function GravarWaypoint({
           <Label>Nome (opcional)</Label>
           <Input placeholder="ex.: entrada da cave" value={nome} onChange={(e) => setNome(e.target.value)} />
         </div>
+        {tipo === "ir" && (
+          <CampoSelect
+            label="Marca (recomendado)"
+            valor={marca || "nenhuma"}
+            onChange={(x) => setMarca(x === "nenhuma" ? "" : x)}
+            opcoes={opcoesMarca}
+            dica="Anda até esta marca nativa do Tibia (detectada no minimapa). Cadastre marcas acima. 'Nenhuma' = modo offset (clique no minimapa)."
+          />
+        )}
         {tipo === "tecla" && <CampoTecla label="Tecla" valor={tecla} onChange={setTecla} />}
         {tipo !== "ir" && (
           <CampoNumero
@@ -275,7 +298,12 @@ function GravarWaypoint({
                 ref={imgRef}
                 src={`data:image/jpeg;base64,${frame.jpeg_base64}`}
                 alt="frame"
-                className="block max-w-full rounded-md border border-border"
+                className="block rounded-md border border-border"
+                style={
+                  tipo === "ir"
+                    ? { width: Math.min(Math.round(frame.largura * 4), 560), maxWidth: "none", imageRendering: "pixelated" }
+                    : { maxWidth: "100%" }
+                }
                 draggable={false}
               />
               {marcador && (

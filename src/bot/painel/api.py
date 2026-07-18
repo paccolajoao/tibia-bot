@@ -19,7 +19,8 @@ Rotas (montadas sob `/api`):
   POST   /config/importar        cria perfil a partir de YAML {nome, yaml}
   GET    /meta                   opções p/ a UI (backends, defaults) + estado
   POST   /entrada/arduino/testar teste rápido do board Arduino HID (não salva nada)
-  POST   /calibracao/frame       captura um frame (JPEG base64) p/ desenhar regiões
+  POST   /calibracao/frame       captura um frame (JPEG base64); ?regiao=minimap recorta só a região
+  POST   /cavebot/testar_marca   testa a detecção de uma marca no minimapa (score/offset)
 """
 
 from __future__ import annotations
@@ -71,6 +72,13 @@ class TesteArduinoBody(BaseModel):
     altura_tela: int = 0
     testar_clique: bool = False  # opt-in: clica de verdade em ponto_clique (ver aba Arduino)
     ponto_clique: tuple[int, int] | None = None
+
+
+class TesteMarcaBody(BaseModel):
+    """Testa a detecção de uma marca no minimapa (ícone recortado no portal)."""
+
+    template_b64: str
+    threshold: float | None = None  # None = usa cavebot.marca_threshold do perfil
 
 
 def _listar_portas_seriais() -> list[str]:
@@ -246,7 +254,10 @@ def criar_router_api(barramento=None, loop=None) -> APIRouter:
 
     # ----- calibração: captura um frame para desenhar as regiões -----
     @r.post("/calibracao/frame")
-    def calibracao_frame():
+    def calibracao_frame(regiao: str | None = None):
+        """Captura um frame p/ desenhar regiões. Com `?regiao=minimap` (ou outra região
+        calibrada), recorta e devolve **só** esse trecho — usado p/ cadastrar marcas /
+        clicar no minimapa sem o print da tela inteira. `origem_x/y` vira o canto da região."""
         from bot.captura.instantaneo import (
             capturar_frame_calibracao,
             codificar_jpeg,
@@ -271,14 +282,74 @@ def criar_router_api(barramento=None, loop=None) -> APIRouter:
                 "Captura veio preta ou vazia. Confira o backend (Tibia oficial exige OBS) "
                 "e se o jogo está visível.",
             )
-        jpeg = codificar_jpeg(frame.imagem)
+
+        imagem = frame.imagem
+        origem_x, origem_y = frame.origem_x, frame.origem_y
+        if regiao:
+            reg = getattr(cfg.regioes, regiao, None)
+            if not isinstance(reg, (list, tuple)) or len(reg) != 4:
+                raise HTTPException(422, f"Região '{regiao}' desconhecida.")
+            ml, mt, mr, mb = (int(x) for x in reg)
+            if mr - ml <= 4 or mb - mt <= 4:
+                raise HTTPException(422, f"Região '{regiao}' não calibrada — calibre-a na aba Calibração primeiro.")
+            esq = max(0, ml - frame.origem_x)
+            topo = max(0, mt - frame.origem_y)
+            dir_ = min(frame.largura, mr - frame.origem_x)
+            base = min(frame.altura, mb - frame.origem_y)
+            imagem = frame.imagem[topo:base, esq:dir_]
+            if imagem.size == 0:
+                raise HTTPException(422, f"Região '{regiao}' fora do frame capturado — recalibre.")
+            origem_x, origem_y = ml, mt
+
+        alt, larg = imagem.shape[:2]
+        jpeg = codificar_jpeg(imagem)
         return {
             "jpeg_base64": base64.b64encode(jpeg).decode("ascii"),
-            "largura": frame.largura,
-            "altura": frame.altura,
-            "origem_x": frame.origem_x,
-            "origem_y": frame.origem_y,
+            "largura": larg,
+            "altura": alt,
+            "origem_x": origem_x,
+            "origem_y": origem_y,
             "backend": frame.backend,
+        }
+
+    # ----- cavebot: testa a detecção de uma marca no minimapa (aba Cavebot) -----
+    @r.post("/cavebot/testar_marca")
+    def testar_marca(body: TesteMarcaBody):
+        from bot.captura.instantaneo import capturar_frame_calibracao, frame_de_capturador
+        from bot.visao.inventario import decodificar_template
+        from bot.visao.marca_minimapa import detectar_marca
+
+        cfg = repo.carregar_config_ativa()
+        if not cfg.regioes.minimap_calibrado:
+            raise HTTPException(422, "Calibre o minimapa (aba Calibração) antes de testar a marca.")
+        tpl = decodificar_template(body.template_b64)
+        if tpl is None:
+            raise HTTPException(422, "Template da marca inválido.")
+
+        cap_vivo = getattr(loop, "cap", None) if (loop is not None and loop.is_alive()) else None
+        try:
+            frame = frame_de_capturador(cap_vivo) if cap_vivo is not None else capturar_frame_calibracao(cfg)
+        except Exception as e:
+            raise HTTPException(500, f"Falha na captura: {e}") from e
+        if frame is None:
+            raise HTTPException(503, "Captura veio preta ou vazia (Tibia oficial exige OBS).")
+
+        ml, mt, mr, mb = cfg.regioes.minimap
+        esq = max(0, ml - frame.origem_x)
+        topo = max(0, mt - frame.origem_y)
+        dir_ = min(frame.largura, mr - frame.origem_x)
+        base = min(frame.altura, mb - frame.origem_y)
+        crop = frame.imagem[topo:base, esq:dir_]
+        if crop.size == 0:
+            raise HTTPException(422, "Região do minimapa fora do frame — recalibre o minimapa.")
+
+        thr = body.threshold if body.threshold is not None else cfg.cavebot.marca_threshold
+        encontrou, offset, score = detectar_marca(crop, tpl, thr)
+        return {
+            "encontrou": encontrou,
+            "offset": list(offset) if offset is not None else None,
+            "score": round(float(score), 4),
+            "threshold": thr,
         }
 
     return r

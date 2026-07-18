@@ -44,6 +44,12 @@ def _combate(ctx, n=1):
     ctx.criaturas = DeteccaoCriaturas(n, False, 1.0, None, None)
 
 
+def _marca(ctx, nome, offset):
+    """Simula o loop publicando a detecção da marca no minimapa."""
+    ctx.estado_comportamentos["cavebot_marca_offset_de"] = nome
+    ctx.estado_comportamentos["cavebot_marca_offset"] = offset
+
+
 def test_cede_ao_combate():
     cfg = _cfg([Waypoint(tipo="ir", x=10, y=20)])
     ctx = _ctx(cfg)
@@ -292,3 +298,118 @@ def test_troca_andar_retenta_e_segue_apos_esgotar():
     ctx.ts = 12.6
     d_next = cb.avaliar(ctx)
     assert d_next.ponto == (2, 2)  # seguiu p/ o próximo waypoint (não travou)
+
+
+# -------------------- navegação por marca nativa (re-detecção contínua) --------------------
+
+def test_marca_reclica_posicao_viva():
+    # a cada ciclo re-clica a posição VIVA da marca (não a de quando detectou).
+    cfg = _cfg([Waypoint(tipo="ir", marca="flag"), Waypoint(tipo="ir", x=2, y=2)])
+    cb = Cavebot(cfg.cavebot)
+    ctx = _ctx(cfg, ts=10.0)
+    # sem offset ainda: pede a detecção da marca ao loop e espera
+    assert cb.avaliar(ctx) is None
+    assert ctx.estado_comportamentos["cavebot_marca_alvo"] == "flag"
+    # detectou longe -> clica a posição viva
+    _marca(ctx, "flag", (20, 5))
+    d1 = cb.avaliar(ctx)
+    assert d1.acao == TipoAcao.CLICAR and d1.ponto == (20, 5)
+    assert d1.dados["relativo_centro"] is True and d1.dados["transformar"] is True
+    # andou um pouco: marca mais perto -> RE-CLICA a posição NOVA (não a antiga)
+    ctx.ts = 10.2
+    _marca(ctx, "flag", (10, 2))
+    d2 = cb.avaliar(ctx)
+    assert d2.acao == TipoAcao.CLICAR and d2.ponto == (10, 2)
+
+
+def test_marca_chega_ao_centro_avanca():
+    cfg = _cfg([Waypoint(tipo="ir", marca="flag"), Waypoint(tipo="ir", x=2, y=2)])
+    cb = Cavebot(cfg.cavebot)
+    ctx = _ctx(cfg, ts=10.0)
+    _marca(ctx, "flag", (20, 5))
+    assert cb.avaliar(ctx).ponto == (20, 5)  # clica longe
+    ctx.ts = 10.4
+    _marca(ctx, "flag", (1, 0))              # marca no centro (dentro do raio) -> chegou
+    assert cb.avaliar(ctx) is None           # não clica; avança
+    ctx.ts = 10.5
+    assert cb.avaliar(ctx).ponto == (2, 2)   # próximo waypoint
+
+
+def test_marca_deslocamento_por_combate_reclica_novo():
+    # o cenário do bug: bicho no meio do caminho desloca o boneco -> ao limpar o combate,
+    # re-clica a posição ATUAL da marca imediatamente (não fica no clique obsoleto).
+    cfg = _cfg([Waypoint(tipo="ir", marca="flag")])
+    cb = Cavebot(cfg.cavebot)
+    ctx = _ctx(cfg, ts=10.0)
+    _marca(ctx, "flag", (15, 0))
+    assert cb.avaliar(ctx).ponto == (15, 0)  # clica
+    ctx.ts = 10.5                            # aparece bicho -> cede (Alvo mata)
+    _combate(ctx, n=1)
+    assert cb.avaliar(ctx) is None
+    ctx.ts = 12.0                            # combate limpou; boneco deslocou
+    ctx.criaturas = None
+    _marca(ctx, "flag", (18, -6))            # marca numa posição NOVA
+    d = cb.avaliar(ctx)
+    assert d.acao == TipoAcao.CLICAR and d.ponto == (18, -6)  # imediato, sem esperar timeout
+
+
+def test_marca_perdida_perto_do_centro_e_assentado_chega():
+    cfg = _cfg([Waypoint(tipo="ir", marca="flag"), Waypoint(tipo="ir", x=2, y=2)])
+    cb = Cavebot(cfg.cavebot)
+    ctx = _ctx(cfg, ts=10.0)
+    _marca(ctx, "flag", (7, 0))              # perto do centro (dentro de 2*raio), mas fora do raio
+    assert cb.avaliar(ctx).ponto == (7, 0)   # clica
+    ctx.ts = 10.3                            # marca some (sob o boneco) + minimapa parado -> chegou
+    _marca(ctx, "flag", None)
+    ctx.estado_comportamentos["minimap_movendo"] = False
+    assert cb.avaliar(ctx) is None
+    ctx.ts = 10.4
+    assert cb.avaliar(ctx).ponto == (2, 2)
+
+
+def test_marca_busca_timeout_pula():
+    # marca nunca aparece (não cadastrada / longe demais): após timeout, pula. Como a
+    # marca é posição absoluta, pular é seguro (o próximo trecho se auto-realinha).
+    cfg = _cfg(
+        [Waypoint(tipo="ir", marca="flag"), Waypoint(tipo="ir", x=2, y=2)],
+        timeout_trecho_s=1.0,
+    )
+    cb = Cavebot(cfg.cavebot)
+    ctx = _ctx(cfg, ts=10.0)
+    assert cb.avaliar(ctx) is None   # inicia a busca (nenhum offset publicado)
+    ctx.ts = 10.5
+    assert cb.avaliar(ctx) is None
+    ctx.ts = 11.1                     # estourou a busca -> pula
+    assert cb.avaliar(ctx) is None
+    ctx.ts = 11.2
+    assert cb.avaliar(ctx).ponto == (2, 2)
+
+
+def test_marca_cede_ao_combate():
+    cfg = _cfg([Waypoint(tipo="ir", marca="flag")])
+    ctx = _ctx(cfg)
+    _combate(ctx, n=1)
+    assert Cavebot(cfg.cavebot).avaliar(ctx) is None
+
+
+def test_status_publicado_para_o_dashboard():
+    cfg = _cfg([Waypoint(tipo="ir", marca="flag", nome="p1")])
+    cb = Cavebot(cfg.cavebot)
+    ctx = _ctx(cfg, ts=10.0)
+    # procurando (ainda sem offset)
+    cb.avaliar(ctx)
+    st = ctx.estado_comportamentos["cavebot_status"]
+    assert st["marca"] == "flag" and st["rotulo"] == "p1" and st["total"] == 1
+    assert st["fase"].startswith("procurando") and st["marca_detectada"] is False
+    # andando (detectou longe, com score)
+    _marca(ctx, "flag", (20, 5))
+    ctx.estado_comportamentos["cavebot_marca_score"] = 0.82
+    cb.avaliar(ctx)
+    st = ctx.estado_comportamentos["cavebot_status"]
+    assert st["fase"] == "andando até a marca"
+    assert st["marca_detectada"] is True and st["marca_score"] == 0.82
+    assert st["marca_offset"] == [20, 5]
+    # em combate -> fase de combate
+    _combate(ctx, n=1)
+    cb.avaliar(ctx)
+    assert ctx.estado_comportamentos["cavebot_status"]["fase"] == "cedendo ao combate"

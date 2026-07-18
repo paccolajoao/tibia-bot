@@ -6,6 +6,7 @@ import type {
   Regiao,
   TesteArduinoBody,
   TesteArduinoResultado,
+  TesteMarcaResultado,
 } from "./types"
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
@@ -59,9 +60,20 @@ export const api = {
 
   // meta + calibração
   meta: () => req<Meta>("/api/meta"),
-  capturarFrame: () => req<FrameCalibracao>("/api/calibracao/frame", { method: "POST" }),
+  // regiao opcional (ex.: "minimap") recorta só esse trecho no servidor
+  capturarFrame: (regiao?: string) =>
+    req<FrameCalibracao>(`/api/calibracao/frame${regiao ? `?regiao=${encodeURIComponent(regiao)}` : ""}`, {
+      method: "POST",
+    }),
 
   // entrada: teste rápido do board Arduino (não salva nada)
   testarArduino: (body: TesteArduinoBody) =>
     req<TesteArduinoResultado>("/api/entrada/arduino/testar", { method: "POST", body: JSON.stringify(body) }),
+
+  // cavebot: testa a detecção de uma marca no minimapa (não salva nada)
+  testarMarca: (template_b64: string, threshold?: number) =>
+    req<TesteMarcaResultado>("/api/cavebot/testar_marca", {
+      method: "POST",
+      body: JSON.stringify({ template_b64, threshold }),
+    }),
 }

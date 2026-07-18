@@ -73,15 +73,20 @@ def _normalizar_template(tpl: np.ndarray) -> tuple[np.ndarray, np.ndarray | None
 
 
 def _melhor_match(
-    roi: np.ndarray, bgr: np.ndarray, mascara: np.ndarray | None
+    roi: np.ndarray, bgr: np.ndarray, mascara: np.ndarray | None,
+    escalas: tuple[float, ...] = ESCALAS,
 ) -> tuple[float, tuple[int, int], int, int]:
-    """Melhor (score, canto_sup_esq, largura, altura) do template na ROI, varrendo escalas."""
+    """Melhor (score, canto_sup_esq, largura, altura) do template na ROI, varrendo escalas.
+
+    `escalas` é parametrizável para o chamador restringir o sweep (ex.: a detecção de
+    marca do minimapa usa uma faixa estreita, pois o ícone é capturado no zoom nativo).
+    """
     rh, rw = roi.shape[:2]
     th0, tw0 = bgr.shape[:2]
     melhor_score = -1.0
     melhor_loc = (0, 0)
     melhor_wh = (tw0, th0)
-    for s in ESCALAS:
+    for s in escalas:
         tw = int(round(tw0 * s))
         th = int(round(th0 * s))
         if tw < 4 or th < 4 or tw > rw or th > rh:

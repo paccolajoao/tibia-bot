@@ -26,6 +26,7 @@ class SnapshotEstado:
     estado_execucao: str
     janela_focada: bool
     backend_captura: str
+    cavebot: dict[str, Any] | None = None  # resumo do cavebot (fase/waypoint/marca) p/ o dashboard
     tipo: str = "estado"
 
     def to_dict(self) -> dict[str, Any]:

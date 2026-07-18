@@ -246,6 +246,20 @@ class Waypoint(BaseModel):
     troca_andar: bool = False
     # rótulo de direção da troca de andar (organização da rota + log); não muda a mecânica.
     direcao: str = ""         # "" | subir | descer
+    # navegação por MARCA nativa (só p/ tipo "ir"): nome de uma CavebotConfig.marcas
+    # cadastrada. Se preenchido, o bot DETECTA essa marca no minimapa e anda até ela,
+    # com chegada = marca no centro (posição absoluta, autocorretivo). Vazio = modo
+    # offset legado (x/y relativo ao centro).
+    marca: str = ""
+
+
+class MarcaMinimapa(BaseModel):
+    """Um ícone de MARCA nativa do Tibia (recortado do frame ou enviado no portal),
+    usado como alvo de navegação: o cavebot detecta esse ícone no minimapa e anda até
+    ele. Identificado por `nome` (referenciado em Waypoint.marca)."""
+
+    nome: str = ""
+    template_b64: str = ""  # PNG do ícone em base64 (sem prefixo data:)
 
 
 class CavebotConfig(BaseModel):
@@ -257,7 +271,7 @@ class CavebotConfig(BaseModel):
     prioridade: int = 20  # acima dos ociosos (usar_mana=15/comer=10); cede ao combate ele mesmo
     waypoints: list[Waypoint] = Field(default_factory=list)
     cooldown_s: float = 0.8          # intervalo mínimo entre cliques de navegação
-    parado_ticks: int = 4            # ticks de minimapa estático p/ considerar "chegou"
+    parado_ticks: int = 4            # ticks de minimapa estático p/ considerar "chegou" (modo offset)
     limiar_movimento: float = 2.0    # diff médio por pixel acima disso = "minimapa movendo"
     timeout_trecho_s: float = 8.0    # desiste do trecho (re-clica/avança) após este tempo
     # watchdog de combate: se há criaturas mas nenhuma morte por este tempo (bicho
@@ -266,6 +280,12 @@ class CavebotConfig(BaseModel):
     # validação de troca de andar: pico de diff do minimapa que confirma que mudou o andar
     limiar_troca_andar: float = 25.0
     tentativas_troca: int = 3        # re-tentativas de um waypoint troca_andar antes de seguir
+    # navegação por MARCAS nativas do Tibia (recomendado): ícones cadastrados que o bot
+    # detecta no minimapa. Um waypoint "ir" com `marca` preenchida anda até a marca
+    # (chegada = marca no centro), em vez do offset fixo — posição absoluta, autocorretivo.
+    marcas: list[MarcaMinimapa] = Field(default_factory=list)
+    marca_threshold: float = 0.7     # confiança mínima do match do ícone (0..1)
+    marca_raio_centro: int = 6       # px: marca a esta distância do centro = "chegou"
 
 
 class MagiaAtaqueConfig(BaseModel):

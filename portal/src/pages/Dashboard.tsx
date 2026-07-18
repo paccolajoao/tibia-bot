@@ -16,6 +16,13 @@ function corEstado(e?: string) {
   return "secondary"
 }
 
+function faseCor(fase: string) {
+  if (fase.startsWith("chegou")) return "success"
+  if (fase.startsWith("cedendo")) return "warning"
+  if (fase.startsWith("procurando")) return "destructive"
+  return "secondary"
+}
+
 function Barra({ rotulo, pct, cor }: { rotulo: string; pct: number | null; cor: string }) {
   const v = pct == null ? 0 : Math.max(0, Math.min(100, pct))
   return (
@@ -203,6 +210,51 @@ export function Dashboard() {
                 valor={t.deteccao?.criaturas?.confianca != null ? t.deteccao.criaturas.confianca.toFixed(2) : "—"}
               />
               <Info rotulo="Backend" valor={e?.backend_captura ?? "—"} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cavebot</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {e?.cavebot ? (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">Fase</span>
+                    <Badge variant={faseCor(e.cavebot.fase) as any}>{e.cavebot.fase}</Badge>
+                  </div>
+                  <Info rotulo="Waypoint" valor={`${e.cavebot.idx + 1}/${e.cavebot.total} · ${e.cavebot.rotulo}`} />
+                  {e.cavebot.marca ? (
+                    <>
+                      <Info rotulo="Marca" valor={e.cavebot.marca} />
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-muted-foreground">Detecção</span>
+                        <span className="flex items-center gap-2 text-right font-medium tabular-nums">
+                          <Badge variant={(e.cavebot.marca_detectada ? "success" : "warning") as any}>
+                            {e.cavebot.marca_detectada ? "detectada" : "não vista"}
+                          </Badge>
+                          score {e.cavebot.marca_score.toFixed(2)}
+                        </span>
+                      </div>
+                      {e.cavebot.marca_offset && (
+                        <Info
+                          rotulo="Offset p/ o centro"
+                          valor={`(${e.cavebot.marca_offset[0]}, ${e.cavebot.marca_offset[1]})`}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <Info rotulo="Modo" valor={e.cavebot.tipo === "ir" ? "offset (sem marca)" : e.cavebot.tipo} />
+                  )}
+                  <Info rotulo="Minimapa" valor={e.cavebot.minimap_movendo ? "rolando" : "parado"} />
+                </>
+              ) : (
+                <p className="text-muted-foreground">
+                  Inativo — cavebot desligado, sem waypoints ou minimapa não calibrado (também aparece assim até
+                  o 1º tick de navegação).
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

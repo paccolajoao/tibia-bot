@@ -121,6 +121,12 @@ export interface Waypoint {
   dwell_s: number
   troca_andar: boolean
   direcao: WaypointDirecao
+  marca: string
+}
+
+export interface MarcaMinimapa {
+  nome: string
+  template_b64: string
 }
 
 export interface CavebotConfig {
@@ -134,6 +140,9 @@ export interface CavebotConfig {
   combate_timeout_s: number
   limiar_troca_andar: number
   tentativas_troca: number
+  marcas: MarcaMinimapa[]
+  marca_threshold: number
+  marca_raio_centro: number
 }
 
 export interface MagiaAtaqueConfig {
@@ -233,6 +242,13 @@ export interface TesteArduinoResultado {
   altura_usada: number
 }
 
+export interface TesteMarcaResultado {
+  encontrou: boolean
+  offset: [number, number] | null
+  score: number
+  threshold: number
+}
+
 export interface FrameCalibracao {
   jpeg_base64: string
   largura: number
@@ -243,6 +259,19 @@ export interface FrameCalibracao {
 }
 
 // ---- telemetria (WebSocket) ----
+export interface CavebotStatus {
+  idx: number
+  total: number
+  rotulo: string
+  tipo: string
+  fase: string
+  marca: string
+  marca_detectada: boolean
+  marca_score: number
+  marca_offset: [number, number] | null
+  minimap_movendo: boolean
+}
+
 export interface TelemetriaEstado {
   tipo: "estado"
   hp_pct: number | null
@@ -253,6 +282,7 @@ export interface TelemetriaEstado {
   estado_execucao: string
   janela_focada: boolean
   backend_captura: string
+  cavebot?: CavebotStatus | null
 }
 
 export interface TelemetriaDecisao {

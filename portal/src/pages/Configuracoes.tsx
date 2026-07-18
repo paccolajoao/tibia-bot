@@ -8,11 +8,12 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampoNumero, CampoSelect, CampoSwitch, CampoTecla, CampoTexto } from "@/components/campos"
 import { DropItens } from "@/components/DropItens"
+import { MarcasMinimapa } from "@/components/MarcasMinimapa"
 import { Waypoints } from "@/components/Waypoints"
 import { TesteArduino } from "@/components/TesteArduino"
 import { useTelemetria } from "@/hooks/useTelemetria"
 import { api } from "@/lib/api"
-import type { Config, ItemDrop, Meta, Regiao, Waypoint } from "@/lib/types"
+import type { Config, ItemDrop, MarcaMinimapa, Meta, Regiao, Waypoint } from "@/lib/types"
 import { getIn, setIn } from "@/lib/utils"
 
 function Secao({ titulo, descricao, children }: { titulo: string; descricao?: string; children: React.ReactNode }) {
@@ -333,22 +334,34 @@ export function Configuracoes() {
         <TabsContent value="cavebot" className="space-y-6">
           <Secao
             titulo="Cavebot (navegação por waypoints)"
-            descricao="Clica pontos no minimapa em sequência (o Tibia pathfinda cada trecho); a chegada é detectada quando o minimapa para de rolar. Cede ao combate. Requer o minimapa calibrado (aba Calibração)."
+            descricao="Anda a hunt clicando no minimapa (o Tibia pathfinda cada trecho). Recomendado: waypoints por MARCA nativa do Tibia — o bot detecta a marca no minimapa e anda até ela, com chegada quando a marca chega ao centro (posição absoluta, autocorretiva). Cede ao combate. Requer o minimapa calibrado (aba Calibração)."
           >
             <CampoSwitch label="Ativo" dica="Liga/desliga o cavebot (também na aba Recursos)." valor={v("cavebot.ativo")} onChange={(x) => set("cavebot.ativo", x)} />
             <CampoNumero label="Prioridade" valor={v("cavebot.prioridade")} onChange={(x) => set("cavebot.prioridade", x)} dica="Baixa: cura/alvo/saque vêm antes (e o cavebot cede ao combate)." />
             <CampoNumero label="Cooldown entre cliques" sufixo="s" step={0.1} min={0} valor={v("cavebot.cooldown_s")} onChange={(x) => set("cavebot.cooldown_s", x)} />
-            <CampoNumero label="Ticks parado p/ 'chegou'" step={1} min={1} valor={v("cavebot.parado_ticks")} onChange={(x) => set("cavebot.parado_ticks", x)} dica="Quantos ticks o minimapa precisa ficar estático para considerar que chegou." />
-            <CampoNumero label="Limiar de movimento" step={0.5} min={0} valor={v("cavebot.limiar_movimento")} onChange={(x) => set("cavebot.limiar_movimento", x)} dica="Diff médio por pixel acima disso = minimapa rolando. Aumente se detectar movimento parado." />
-            <CampoNumero label="Timeout do trecho" sufixo="s" step={0.5} min={0} valor={v("cavebot.timeout_trecho_s")} onChange={(x) => set("cavebot.timeout_trecho_s", x)} dica="Desiste do trecho e avança após este tempo (rede p/ clique perdido)." />
+            <CampoNumero label="Timeout do trecho" sufixo="s" step={0.5} min={0} valor={v("cavebot.timeout_trecho_s")} onChange={(x) => set("cavebot.timeout_trecho_s", x)} dica="Se não chegar neste tempo, re-clica a mesma marca (destrava)." />
             <CampoNumero label="Timeout de combate" sufixo="s" step={1} min={0} valor={v("cavebot.combate_timeout_s")} onChange={(x) => set("cavebot.combate_timeout_s", x)} dica="Se há criatura mas nenhuma morte por este tempo (bicho inalcançável), volta a andar em vez de travar. 0 = nunca desiste." />
-            <CampoNumero label="Limiar de troca de andar" step={1} min={0} valor={v("cavebot.limiar_troca_andar")} onChange={(x) => set("cavebot.limiar_troca_andar", x)} dica="Pico de mudança do minimapa que confirma escada/buraco/corda. Baixe se trocas não forem detectadas." />
-            <CampoNumero label="Tentativas de troca" step={1} min={1} valor={v("cavebot.tentativas_troca")} onChange={(x) => set("cavebot.tentativas_troca", x)} dica="Re-tentativas de um waypoint 'muda de andar' antes de seguir (best-effort, não trava)." />
+            <CampoNumero label="Confiança da marca" step={0.05} min={0} max={1} valor={v("cavebot.marca_threshold")} onChange={(x) => set("cavebot.marca_threshold", x)} dica="Confiança mínima (0..1) do reconhecimento do ícone da marca. Baixe se a marca não for detectada; suba se detectar no lugar errado." />
+            <CampoNumero label="Raio de chegada (px)" step={1} min={1} valor={v("cavebot.marca_raio_centro")} onChange={(x) => set("cavebot.marca_raio_centro", x)} dica="A marca a esta distância do centro do minimapa = chegou. Aumente se ele parar cedo antes de encostar." />
+            <CampoNumero label="Tentativas (re-clique/troca)" step={1} min={1} valor={v("cavebot.tentativas_troca")} onChange={(x) => set("cavebot.tentativas_troca", x)} dica="Re-cliques de uma marca travada / re-tentativas de troca de andar antes de seguir (best-effort, não trava)." />
+            <MarcasMinimapa
+              marcas={(v("cavebot.marcas") ?? []) as MarcaMinimapa[]}
+              onChange={(ms) => set("cavebot.marcas", ms)}
+            />
             <Waypoints
               waypoints={(v("cavebot.waypoints") ?? []) as Waypoint[]}
               onChange={(wps) => set("cavebot.waypoints", wps)}
               minimapRegiao={cfg.regioes.minimap as [number, number, number, number]}
+              marcas={(v("cavebot.marcas") ?? []) as MarcaMinimapa[]}
             />
+            <details className="sm:col-span-2 text-sm text-muted-foreground">
+              <summary className="cursor-pointer">Ajustes avançados (modo offset legado)</summary>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <CampoNumero label="Ticks parado p/ 'chegou'" step={1} min={1} valor={v("cavebot.parado_ticks")} onChange={(x) => set("cavebot.parado_ticks", x)} dica="Só p/ waypoints 'ir' SEM marca: ticks de minimapa estático p/ considerar chegada." />
+                <CampoNumero label="Limiar de movimento" step={0.5} min={0} valor={v("cavebot.limiar_movimento")} onChange={(x) => set("cavebot.limiar_movimento", x)} dica="Diff médio por pixel acima disso = minimapa rolando." />
+                <CampoNumero label="Limiar de troca de andar" step={1} min={0} valor={v("cavebot.limiar_troca_andar")} onChange={(x) => set("cavebot.limiar_troca_andar", x)} dica="Mudança persistente do minimapa que confirma escada/buraco/corda. Baixe se trocas não forem detectadas." />
+              </div>
+            </details>
           </Secao>
         </TabsContent>
 
